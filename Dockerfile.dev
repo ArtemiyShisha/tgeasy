@@ -1,35 +1,23 @@
-FROM node:18-alpine
-
-RUN apk add --no-cache \
-    libc6-compat \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/cache/apk/*
-
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
+# --- STAGE 1: Base ---
+# Используем официальный образ Node.js 18 в качестве базового
+FROM node:18-alpine AS base
+# Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
-
+# Копируем package.json и package-lock.json для установки зависимостей
 COPY package*.json ./
-COPY yarn.lock* ./
+# Устанавливаем зависимости
+RUN npm install
 
-RUN yarn install --frozen-lockfile && \
-    yarn cache clean
-
-COPY --chown=nextjs:nodejs . .
-
-ENV NODE_ENV=development
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
-
-RUN chown -R nextjs:nodejs /app
-USER nextjs
-
+# --- STAGE 2: Development ---
+# Начинаем новый этап с того же базового образа, чтобы сохранить чистоту
+FROM base AS dev
+# Устанавливаем рабочую директорию
+WORKDIR /app
+# Копируем зависимости, установленные на предыдущем этапе
+COPY --from=base /app/node_modules ./node_modules
+# Копируем весь исходный код приложения
+COPY . .
+# Открываем порт 3000 для доступа к приложению
 EXPOSE 3000
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
-
-CMD ["yarn", "dev"]
+# Команда для запуска приложения в режиме разработки
+CMD ["npm", "run", "dev"]

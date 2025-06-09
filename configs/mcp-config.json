@@ -1,0 +1,32 @@
+{
+  "project": {
+    "name": "TGeasy",
+    "type": "saas-dashboard",
+    "primaryColor": "#3b82f6",
+    "accentColor": "#10b981"
+  },
+  "designSystem": {
+    "framework": "tailwind",
+    "componentLibrary": "shadcn/ui",
+    "theme": "modern-saas",
+    "colorScheme": ["light", "dark"],
+    "typography": "inter",
+    "spacing": "8px-grid",
+    "borderRadius": "medium"
+  },
+  "generationRules": {
+    "namingConvention": "pascal-case",
+    "fileStructure": "feature-based",
+    "exportType": "named"
+  },
+  "features": {
+    "accessibilityLevel": "WCAG-AA",
+    "animations": "subtle",
+    "performanceMode": "optimized",
+    "typeSafety": "typescript"
+  },
+  "api": {
+    "apiKey": "process.env.MCP_API_KEY",
+    "projectId": "process.env.MCP_PROJECT_ID"
+  }
+} 

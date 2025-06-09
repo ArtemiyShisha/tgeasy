@@ -279,7 +279,7 @@ Telegram и email уведомления
 
 ---
 
-### Задача 5: Docker окружение для разработки
+### Задача 5: Docker окружение для разработки ✅ ЗАВЕРШЕНО
 
 **Модуль**: Infrastructure  
 **Приоритет**: Средний  
@@ -333,7 +333,7 @@ Telegram и email уведомления
 
 ---
 
-### Задача 6: Настройка 21st.dev MCP
+### Задача 6: Настройка 21st.dev MCP ✅ ЗАВЕРШЕНО
 
 **Модуль**: Infrastructure  
 **Приоритет**: Критический  
@@ -357,11 +357,11 @@ Telegram и email уведомления
 - Performance optimization guidelines
 
 **Критерии готовности**:
-- [ ] MCP настроен и работает
-- [ ] Component generation guidelines созданы
-- [ ] Design system интегрирован
-- [ ] Type safety обеспечен
-- [ ] Performance guidelines установлены
+- [x] MCP настроен и работает
+- [x] Component generation guidelines созданы
+- [x] Design system интегрирован
+- [x] Type safety обеспечен
+- [x] Performance guidelines установлены
 
 **Промт**:
 Настрой 21st.dev MCP для генерации UI компонентов в TGeasy.

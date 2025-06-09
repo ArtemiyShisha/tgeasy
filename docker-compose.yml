@@ -2,7 +2,7 @@
 version: '3.8'
 
 services:
-  # Next.js приложение
+  # Сервис для Next.js приложения
   app:
     build:
       context: .
@@ -11,94 +11,66 @@ services:
     ports:
       - "3000:3000"
     volumes:
+      # Монтируем исходный код для hot-reloading
       - .:/app
+      # Анонимные вольюмы для кеша, чтобы избежать перезаписи из хост-машины
       - /app/node_modules
       - /app/.next
-    environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_SUPABASE_URL=http://localhost:8000
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/tgeasy
-      - REDIS_URL=redis://redis:6379
-      - TELEGRAM_BOT_TOKEN=1234567890:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-      - ORD_API_KEY=test_ord_api_key
-      - ORD_CLIENT_ID=test_ord_client
-      - YOOKASSA_SHOP_ID=123456
-      - YOOKASSA_SECRET_KEY=test_yookassa_key
-      - NEXTAUTH_SECRET=super-secret-jwt-token-for-development-only
-      - NEXTAUTH_URL=http://localhost:3000
+    env_file:
+      - .env.local
+    # Зависит от успешного запуска базы данных и Redis
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_healthy
+        condition: service_started
     networks:
-      - tgeasy-network
-    restart: unless-stopped
+      - tgeasy-net
 
-  # PostgreSQL база данных
+  # Сервис базы данных PostgreSQL
   db:
     image: postgres:15-alpine
     container_name: tgeasy-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: tgeasy_db
     ports:
       - "5432:5432"
-    environment:
-      - POSTGRES_DB=tgeasy
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
     volumes:
+      # Вольюм для сохранения данных PostgreSQL
       - postgres_data:/var/lib/postgresql/data
-      - ./schemas/database.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/02-init.sql:ro
+      # Монтируем SQL-миграции для автоматической инициализации БД при первом запуске
+      # ВАЖНО: Убедитесь, что директория supabase/migrations существует и содержит ваши миграции
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d tgeasy"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tgeasy_db"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - tgeasy-network
-    restart: unless-stopped
+      - tgeasy-net
 
-  # Redis для кэширования
+  # Сервис для кеширования Redis
   redis:
     image: redis:7-alpine
     container_name: tgeasy-redis
+    restart: always
     ports:
       - "6379:6379"
     volumes:
+      # Вольюм для сохранения данных Redis
       - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
     networks:
-      - tgeasy-network
-    restart: unless-stopped
+      - tgeasy-net
 
-  # Adminer для управления БД
-  adminer:
-    image: adminer:4-standalone
-    container_name: tgeasy-adminer
-    ports:
-      - "8080:8080"
-    environment:
-      - ADMINER_DEFAULT_SERVER=db
-      - ADMINER_DESIGN=lucas-sandery
-    depends_on:
-      - db
-    networks:
-      - tgeasy-network
-    restart: unless-stopped
-
+# Именованные вольюмы для персистентности данных
 volumes:
   postgres_data:
-    driver: local
   redis_data:
-    driver: local
 
+# Сеть для взаимодействия между контейнерами
 networks:
-  tgeasy-network:
+  tgeasy-net:
     driver: bridge
