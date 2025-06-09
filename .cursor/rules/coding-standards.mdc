@@ -1,0 +1,1681 @@
+# Стандарты кода TGeasy для AI-инструментов
+
+Этот документ содержит детальные стандарты написания кода для TGeasy. Следуйте этим правилам при работе с Cursor/Windsurf для обеспечения консистентности и качества кода.
+
+## 1. Code Formatting
+
+### Основные правила форматирования
+```typescript
+// ✅ ПРАВИЛЬНО: 2 пробела для отступов
+function createPost(data: CreatePostData): Promise<Post> {
+  if (!data.title) {
+    throw new Error('Title is required')
+  }
+  
+  return postRepository.create(data)
+}
+
+// ❌ НЕПРАВИЛЬНО: 4 пробела или табы
+function createPost(data: CreatePostData): Promise<Post> {
+    if (!data.title) {
+        throw new Error('Title is required')
+    }
+    
+    return postRepository.create(data)
+}
+```
+
+### Длина строк и переносы
+```typescript
+// ✅ ПРАВИЛЬНО: Максимум 100 символов в строке
+const post = await postRepository.create({
+  title: data.title,
+  channelId: data.channelId,
+  userId: user.id
+})
+
+// ✅ ПРАВИЛЬНО: Перенос длинных объектов
+const telegramMessage = await telegramService.sendMessage(
+  channelId,
+  formatMessageWithErid(post.creative.text, post.erid),
+  {
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    reply_markup: getPostKeyboard(post.id)
+  }
+)
+
+// ❌ НЕПРАВИЛЬНО: Слишком длинная строка
+const telegramMessage = await telegramService.sendMessage(channelId, formatMessageWithErid(post.creative.text, post.erid), { parse_mode: 'HTML', disable_web_page_preview: true })
+```
+
+### Скобки и пробелы
+```typescript
+// ✅ ПРАВИЛЬНО: Пробелы вокруг операторов
+const isValid = post.title.length > 0 && post.title.length <= 255
+const updatedPost = { ...post, status: 'published' }
+
+// ✅ ПРАВИЛЬНО: Скобки на той же строке
+if (user.hasPermission(channelId)) {
+  await publishPost(post)
+} else {
+  throw new Error('Permission denied')
+}
+
+// ❌ НЕПРАВИЛЬНО: Отсутствие пробелов
+const isValid=post.title.length>0&&post.title.length<=255
+const updatedPost={...post,status:'published'}
+
+// ❌ НЕПРАВИЛЬНО: Скобки на новой строке
+if (user.hasPermission(channelId))
+{
+  await publishPost(post)
+}
+```
+
+## 2. Naming Conventions
+
+### Variables и Functions
+```typescript
+// ✅ ПРАВИЛЬНО: camelCase для переменных и функций
+const postTitle = 'My Advertisement'
+const channelId = 'channel-123'
+const isPublished = true
+
+async function createAdvertisementPost(data: CreatePostData): Promise<Post> {
+  return postRepository.create(data)
+}
+
+// ✅ ПРАВИЛЬНО: Описательные имена
+const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN
+const maxFileUploadSize = 5 * 1024 * 1024 // 5MB
+const ordRegistrationTimeout = 30000 // 30 seconds
+
+// ❌ НЕПРАВИЛЬНО: Сокращения и неясные имена
+const pst = 'My Ad'
+const chId = 'channel-123'
+const pub = true
+const t = process.env.TELEGRAM_BOT_TOKEN
+const max = 5 * 1024 * 1024
+```
+
+### Constants
+```typescript
+// ✅ ПРАВИЛЬНО: SCREAMING_SNAKE_CASE для констант
+const MAX_POST_LENGTH = 4096
+const DEFAULT_CACHE_TTL = 3600
+const SUBSCRIPTION_PLANS = {
+  BASIC: {
+    PRICE: 3490,
+    MAX_CHANNELS: 5,
+    MAX_POSTS_PER_MONTH: 50
+  },
+  PROFESSIONAL: {
+    PRICE: 6990,
+    MAX_CHANNELS: 15,
+    MAX_POSTS_PER_MONTH: 200
+  }
+} as const
+
+// ❌ НЕПРАВИЛЬНО: camelCase для констант
+const maxPostLength = 4096
+const defaultCacheTtl = 3600
+```
+
+### Types и Interfaces
+```typescript
+// ✅ ПРАВИЛЬНО: PascalCase для типов и интерфейсов
+interface CreatePostData {
+  title: string
+  channelId: string
+  creative: CreativeData
+}
+
+type PostStatus = 'draft' | 'scheduled' | 'published' | 'failed'
+type SubscriptionPlan = 'basic' | 'professional' | 'corporate'
+
+// ✅ ПРАВИЛЬНО: Суффиксы для специфичных типов
+interface PostRepository {
+  create(data: CreatePostData): Promise<Post>
+  findById(id: string): Promise<Post | null>
+}
+
+type CreatePostRequest = z.infer<typeof CreatePostSchema>
+type PostApiResponse = ApiResponse<Post>
+
+// ❌ НЕПРАВИЛЬНО: camelCase для типов
+interface createPostData { }
+type postStatus = 'draft' | 'published'
+```
+
+### React Components
+```typescript
+// ✅ ПРАВИЛЬНО: PascalCase для компонентов
+export function PostForm({ onSubmit }: PostFormProps) {
+  return <form onSubmit={onSubmit}>...</form>
+}
+
+export function ChannelSelectionDropdown() {
+  return <select>...</select>
+}
+
+// ✅ ПРАВИЛЬНО: Описательные имена компонентов
+export function CreatePostModal() { }
+export function PostAnalyticsDashboard() { }
+export function TelegramChannelConnector() { }
+
+// ❌ НЕПРАВИЛЬНО: Общие или сокращенные имена
+export function Form() { }
+export function Modal() { }
+export function PostComp() { }
+```
+
+## 3. Import Organization
+
+### Порядок импортов
+```typescript
+// ✅ ПРАВИЛЬНО: Строгий порядок импортов
+
+// 1. React и Next.js
+import React, { useState, useCallback } from 'react'
+import { NextRequest, NextResponse } from 'next/server'
+import { Metadata } from 'next'
+
+// 2. External libraries (алфавитный порядок)
+import { z } from 'zod'
+import { toast } from 'sonner'
+import useSWR from 'swr'
+
+// 3. Internal utilities и services
+import { supabase } from '@/lib/supabase/client'
+import { telegramService } from '@/lib/integrations/telegram'
+import { postService } from '@/lib/services/post-service'
+
+// 4. Types
+import type { Post, CreatePostData } from '@/types/post'
+import type { Channel } from '@/types/channel'
+
+// 5. Components (shadcn/ui сначала)
+import { Button } from '@/components/ui/button'
+import { Form, FormField } from '@/components/ui/form'
+import { PostForm } from '@/components/posts/post-form'
+
+// 6. Hooks
+import { usePosts } from '@/hooks/use-posts'
+import { useChannels } from '@/hooks/use-channels'
+
+// Пустая строка перед каждой группой
+```
+
+### Group imports
+```typescript
+// ✅ ПРАВИЛЬНО: Группировка связанных импортов
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
+
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@/components/ui/form'
+
+// ❌ НЕПРАВИЛЬНО: Отдельные импорты для связанных элементов
+import { Select } from '@/components/ui/select'
+import { SelectContent } from '@/components/ui/select'
+import { SelectItem } from '@/components/ui/select'
+```
+
+## 4. Function Guidelines
+
+### Function Declaration Style
+```typescript
+// ✅ ПРАВИЛЬНО: Arrow functions для simple operations
+const formatErid = (erid: string): string => `erid:${erid}`
+const isValidInn = (inn: string): boolean => /^\d{10,12}$/.test(inn)
+
+// ✅ ПРАВИЛЬНО: Function declarations для complex logic
+async function createPostWithOrdRegistration(data: CreatePostData): Promise<Post> {
+  // Валидация данных
+  validatePostData(data)
+  
+  // Создание поста
+  const post = await postRepository.create(data)
+  
+  // Регистрация в ОРД
+  try {
+    const erid = await ordService.registerCreative(post)
+    await postRepository.update(post.id, { erid })
+  } catch (error) {
+    console.error('ОРД registration failed:', error)
+  }
+  
+  return post
+}
+
+// ✅ ПРАВИЛЬНО: Explicit return types
+function calculateSubscriptionPrice(
+  plan: SubscriptionPlan,
+  discount?: number
+): { price: number; discountedPrice: number } {
+  const basePrice = SUBSCRIPTION_PLANS[plan].PRICE
+  const discountedPrice = discount 
+    ? basePrice * (1 - discount / 100)
+    : basePrice
+    
+  return { price: basePrice, discountedPrice }
+}
+```
+
+### Parameter Guidelines
+```typescript
+// ✅ ПРАВИЛЬНО: Максимум 3-4 параметра
+function sendTelegramNotification(
+  userId: string,
+  message: string,
+  options?: NotificationOptions
+): Promise<void> {
+  return telegramService.sendMessage(userId, message, options)
+}
+
+// ✅ ПРАВИЛЬНО: Объект для множества параметров
+interface CreatePostParams {
+  title: string
+  channelId: string
+  creative: CreativeData
+  advertiserInfo: AdvertiserInfo
+  scheduledAt?: Date
+}
+
+function createPost(params: CreatePostParams): Promise<Post> {
+  return postService.create(params)
+}
+
+// ❌ НЕПРАВИЛЬНО: Слишком много параметров
+function createPost(
+  title: string,
+  channelId: string,
+  text: string,
+  images: string[],
+  targetUrl: string,
+  inn: string,
+  advertiserName: string,
+  productDescription: string,
+  scheduledAt: Date
+): Promise<Post> {
+  // ...
+}
+```
+
+### Function Size
+```typescript
+// ✅ ПРАВИЛЬНО: Функции до 20 строк
+async function publishPost(postId: string): Promise<void> {
+  const post = await postRepository.findById(postId)
+  if (!post) throw new Error('Post not found')
+  
+  const message = formatTelegramMessage(post)
+  const result = await telegramService.sendMessage(post.channelId, message)
+  
+  await postRepository.update(postId, {
+    status: 'published',
+    telegramMessageId: result.message_id,
+    publishedAt: new Date()
+  })
+}
+
+// ✅ ПРАВИЛЬНО: Разбиение больших функций
+async function processPostCreation(data: CreatePostData): Promise<Post> {
+  await validatePostData(data)
+  const post = await createPostInDatabase(data)
+  await registerPostInOrd(post)
+  await sendCreationNotification(post)
+  return post
+}
+
+async function validatePostData(data: CreatePostData): Promise<void> {
+  if (!data.title) throw new Error('Title required')
+  if (data.title.length > 255) throw new Error('Title too long')
+  await validateChannelAccess(data.channelId, data.userId)
+}
+```
+
+## 5. Variable Declaration
+
+### const vs let vs var
+```typescript
+// ✅ ПРАВИЛЬНО: const по умолчанию
+const postTitle = 'My Advertisement'
+const channelIds = ['channel1', 'channel2']
+const config = { timeout: 5000, retries: 3 }
+
+// ✅ ПРАВИЛЬНО: let только когда переменная изменяется
+let currentStep = 1
+let isLoading = false
+let errorMessage: string | null = null
+
+for (let i = 0; i < posts.length; i++) {
+  // process post
+}
+
+// ❌ НЕПРАВИЛЬНО: var (никогда не используйте)
+var postTitle = 'My Advertisement' // ❌
+var isLoading = false // ❌
+```
+
+### Destructuring
+```typescript
+// ✅ ПРАВИЛЬНО: Destructuring для объектов и массивов
+const { title, channelId, creative } = postData
+const { text, images, targetUrl } = creative
+const [firstPost, ...otherPosts] = posts
+
+// ✅ ПРАВИЛЬНО: Переименование при destructuring
+const { 
+  data: posts, 
+  error: postsError, 
+  isLoading: isPostsLoading 
+} = usePosts()
+
+// ✅ ПРАВИЛЬНО: Default values в destructuring
+const { 
+  timeout = 5000, 
+  retries = 3,
+  enableCaching = true 
+} = options
+
+// ❌ НЕПРАВИЛЬНО: Избыточные переменные
+const title = postData.title
+const channelId = postData.channelId
+const creative = postData.creative
+const text = creative.text
+```
+
+## 6. Error Handling Style
+
+### Try-Catch patterns
+```typescript
+// ✅ ПРАВИЛЬНО: Specific error handling
+async function createPost(data: CreatePostData): Promise<Post> {
+  try {
+    validatePostData(data)
+    const post = await postRepository.create(data)
+    return post
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw new Error(`Validation failed: ${error.message}`)
+    }
+    
+    if (error instanceof DatabaseError) {
+      console.error('Database error in createPost:', error)
+      throw new Error('Failed to save post')
+    }
+    
+    console.error('Unexpected error in createPost:', error)
+    throw new Error('Internal server error')
+  }
+}
+
+// ✅ ПРАВИЛЬНО: Error logging с контекстом
+async function registerPostInOrd(post: Post): Promise<string> {
+  try {
+    const erid = await ordService.registerCreative(post)
+    console.log('ОРД registration successful:', { postId: post.id, erid })
+    return erid
+  } catch (error) {
+    console.error('ОРД registration failed:', {
+      postId: post.id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      advertiserInn: post.advertiserInfo.inn
+    })
+    throw error
+  }
+}
+```
+
+### Error Messages
+```typescript
+// ✅ ПРАВИЛЬНО: Понятные error messages
+throw new Error('Post title cannot be longer than 255 characters')
+throw new Error('Channel not found or access denied')
+throw new Error('ОРД registration failed: Invalid INN format')
+throw new Error('Telegram API rate limit exceeded, try again in 1 minute')
+
+// ✅ ПРАВИЛЬНО: Error context для debugging
+throw new Error(`Failed to upload file: ${fileName}. Size: ${fileSize}B, Max allowed: ${MAX_FILE_SIZE}B`)
+
+// ❌ НЕПРАВИЛЬНО: Неинформативные сообщения
+throw new Error('Error')
+throw new Error('Something went wrong')
+throw new Error('Invalid data')
+```
+
+## 7. React Specific Guidelines
+
+### Hook Rules
+```typescript
+// ✅ ПРАВИЛЬНО: Hooks в начале компонента
+function PostForm() {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { posts, create } = usePosts()
+  const form = useForm<CreatePostData>({
+    resolver: zodResolver(CreatePostSchema)
+  })
+  
+  const handleSubmit = useCallback(async (data: CreatePostData) => {
+    setIsSubmitting(true)
+    try {
+      await create(data)
+      form.reset()
+    } catch (error) {
+      console.error('Failed to create post:', error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [create, form])
+  
+  return (
+    <form onSubmit={form.handleSubmit(handleSubmit)}>
+      {/* form content */}
+    </form>
+  )
+}
+
+// ❌ НЕПРАВИЛЬНО: Hooks в условиях или циклах
+function PostForm() {
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  
+  if (showAdvanced) {
+    const { channels } = useChannels() // ❌ Hook в условии
+  }
+  
+  return <form>...</form>
+}
+```
+
+### Component Props
+```typescript
+// ✅ ПРАВИЛЬНО: Explicit prop interfaces
+interface PostFormProps {
+  initialData?: Partial<CreatePostData>
+  onSubmit: (data: CreatePostData) => Promise<void>
+  onCancel?: () => void
+  disabled?: boolean
+}
+
+function PostForm({ 
+  initialData, 
+  onSubmit, 
+  onCancel, 
+  disabled = false 
+}: PostFormProps) {
+  // component logic
+}
+
+// ✅ ПРАВИЛЬНО: Children typing
+interface ModalProps {
+  children: React.ReactNode
+  title: string
+  isOpen: boolean
+  onClose: () => void
+}
+
+// ❌ НЕПРАВИЛЬНО: Inline props без типизации
+function PostForm(props: any) { } // ❌
+function PostForm({ data, onSubmit }: { data: any, onSubmit: any }) { } // ❌
+```
+
+### Event Handlers
+```typescript
+// ✅ ПРАВИЛЬНО: Typed event handlers
+function FileUpload() {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('File too large')
+      return
+    }
+    
+    uploadFile(file)
+  }
+  
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    // handle submit
+  }
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="file" onChange={handleFileChange} />
+    </form>
+  )
+}
+```
+
+## 8. TypeScript Style
+
+### Interface vs Type
+```typescript
+// ✅ ПРАВИЛЬНО: Interface для объектных структур
+interface Post {
+  id: string
+  title: string
+  status: PostStatus
+  createdAt: Date
+  updatedAt: Date
+}
+
+interface PostRepository {
+  create(data: CreatePostData): Promise<Post>
+  findById(id: string): Promise<Post | null>
+}
+
+// ✅ ПРАВИЛЬНО: Type для unions, primitives, computed types
+type PostStatus = 'draft' | 'scheduled' | 'published' | 'failed'
+type CreatePostData = Omit<Post, 'id' | 'createdAt' | 'updatedAt'>
+type PostApiResponse = ApiResponse<Post>
+
+// ✅ ПРАВИЛЬНО: Extending interfaces
+interface CreatePostRequest extends CreatePostData {
+  userId: string
+}
+```
+
+### Generic Types
+```typescript
+// ✅ ПРАВИЛЬНО: Descriptive generic names
+interface ApiResponse<TData> {
+  data: TData
+  error?: string
+  meta?: ResponseMeta
+}
+
+interface Repository<TEntity, TCreateData, TUpdateData> {
+  create(data: TCreateData): Promise<TEntity>
+  update(id: string, data: TUpdateData): Promise<TEntity>
+}
+
+// ✅ ПРАВИЛЬНО: Constrained generics
+interface ServiceConfig<TIntegration extends 'telegram' | 'ord' | 'yookassa'> {
+  type: TIntegration
+  apiKey: string
+  timeout: number
+}
+
+// ❌ НЕПРАВИЛЬНО: Неописательные имена
+interface ApiResponse<T> { } // Слишком общее
+interface Repository<A, B, C> { } // Неясные имена
+```
+
+### Enum Usage
+```typescript
+// ✅ ПРАВИЛЬНО: String enums для читаемости
+enum PostStatus {
+  DRAFT = 'draft',
+  SCHEDULED = 'scheduled',
+  PUBLISHED = 'published',
+  FAILED = 'failed'
+}
+
+enum SubscriptionPlan {
+  BASIC = 'basic',
+  PROFESSIONAL = 'professional',
+  CORPORATE = 'corporate'
+}
+
+// ✅ ПРАВИЛЬНО: Const assertions для неизменяемых объектов
+const TELEGRAM_PARSE_MODES = ['HTML', 'Markdown'] as const
+type TelegramParseMode = typeof TELEGRAM_PARSE_MODES[number]
+
+// ❌ НЕПРАВИЛЬНО: Numeric enums без explicit values
+enum PostStatus {
+  DRAFT, // ❌ Неясно какое значение
+  PUBLISHED
+}
+```
+
+## 9. Performance Guidelines
+
+### React.memo Usage
+```typescript
+// ✅ ПРАВИЛЬНО: Memo для часто ререндеренных компонентов
+interface PostCardProps {
+  post: Post
+  onEdit: (id: string) => void
+  onDelete: (id: string) => void
+}
+
+export const PostCard = React.memo(function PostCard({
+  post,
+  onEdit,
+  onDelete
+}: PostCardProps) {
+  return (
+    <div className="post-card">
+      <h3>{post.title}</h3>
+      <p>{post.status}</p>
+      <Button onClick={() => onEdit(post.id)}>Edit</Button>
+      <Button onClick={() => onDelete(post.id)}>Delete</Button>
+    </div>
+  )
+})
+
+// ✅ ПРАВИЛЬНО: Custom comparison для сложных props
+const PostAnalytics = React.memo(
+  function PostAnalytics({ post, analytics }: PostAnalyticsProps) {
+    // Component logic
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.post.id === nextProps.post.id &&
+      prevProps.analytics.updatedAt === nextProps.analytics.updatedAt
+    )
+  }
+)
+```
+
+### useCallback и useMemo
+```typescript
+// ✅ ПРАВИЛЬНО: useCallback для стабильных функций
+function PostsList() {
+  const { posts, update, remove } = usePosts()
+  
+  const handleEdit = useCallback((id: string) => {
+    router.push(`/posts/${id}/edit`)
+  }, [router])
+  
+  const handleDelete = useCallback(async (id: string) => {
+    if (confirm('Are you sure?')) {
+      await remove(id)
+    }
+  }, [remove])
+  
+  const filteredPosts = useMemo(() => {
+    return posts.filter(post => post.status !== 'deleted')
+  }, [posts])
+  
+  return (
+    <div>
+      {filteredPosts.map(post => (
+        <PostCard
+          key={post.id}
+          post={post}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      ))}
+    </div>
+  )
+}
+
+// ❌ НЕПРАВИЛЬНО: Избыточное использование
+function SimpleComponent() {
+  const [count, setCount] = useState(0)
+  
+  // ❌ Не нужен useCallback для простого setter
+  const increment = useCallback(() => {
+    setCount(c => c + 1)
+  }, [])
+  
+  // ❌ Не нужен useMemo для простых вычислений
+  const doubled = useMemo(() => count * 2, [count])
+  
+  return <div>{doubled}</div>
+}
+```
+
+## 10. Accessibility Standards
+
+### Semantic HTML
+```typescript
+// ✅ ПРАВИЛЬНО: Семантичная разметка
+function PostForm() {
+  return (
+    <form>
+      <fieldset>
+        <legend>Post Information</legend>
+        
+        <label htmlFor="post-title">
+          Title
+          <input
+            id="post-title"
+            name="title"
+            type="text"
+            required
+            aria-describedby="title-help"
+          />
+        </label>
+        <small id="title-help">
+          Enter a descriptive title for your advertisement
+        </small>
+        
+        <label htmlFor="post-text">
+          Content
+          <textarea
+            id="post-text"
+            name="text"
+            required
+            aria-describedby="text-help"
+          />
+        </label>
+        <small id="text-help">
+          Maximum 4096 characters
+        </small>
+      </fieldset>
+      
+      <button type="submit">Create Post</button>
+    </form>
+  )
+}
+
+// ❌ НЕПРАВИЛЬНО: Неcемантичная разметка
+function PostForm() {
+  return (
+    <div>
+      <div>Post Information</div>
+      <div>
+        <div>Title</div>
+        <input />
+      </div>
+      <div onClick={handleSubmit}>Create</div>
+    </div>
+  )
+}
+```
+
+### ARIA Attributes
+```typescript
+// ✅ ПРАВИЛЬНО: Правильное использование ARIA
+function LoadingButton({ isLoading, children, ...props }: LoadingButtonProps) {
+  return (
+    <button
+      {...props}
+      disabled={isLoading}
+      aria-busy={isLoading}
+      aria-describedby={isLoading ? "loading-text" : undefined}
+    >
+      {isLoading ? (
+        <>
+          <Spinner aria-hidden="true" />
+          <span id="loading-text" className="sr-only">
+            Creating post...
+          </span>
+        </>
+      ) : (
+        children
+      )}
+    </button>
+  )
+}
+
+// ✅ ПРАВИЛЬНО: Accessible модальные окна
+function Modal({ isOpen, onClose, title, children }: ModalProps) {
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={onClose}
+      aria-labelledby="modal-title"
+      aria-describedby="modal-description"
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle id="modal-title">{title}</DialogTitle>
+        </DialogHeader>
+        <div id="modal-description">
+          {children}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+```
+
+## 11. Comments и Documentation
+
+### Code Comments
+```typescript
+// ✅ ПРАВИЛЬНО: Объяснение сложной бизнес-логики
+function calculateSubscriptionUsage(
+  plan: SubscriptionPlan,
+  currentUsage: UsageStats
+): UsageLimits {
+  const limits = SUBSCRIPTION_PLANS[plan]
+  
+  // Проверяем превышение лимитов каналов
+  // Базовый план позволяет превышение на 20% при оплаченной подписке
+  const channelOverageAllowed = plan === 'basic' 
+    ? Math.floor(limits.MAX_CHANNELS * 1.2)
+    : limits.MAX_CHANNELS
+  
+  // Рассчитываем оставшуюся квоту постов
+  // Квота сбрасывается 1 числа каждого месяца по UTC
+  const postsRemaining = Math.max(
+    0,
+    limits.MAX_POSTS_PER_MONTH - currentUsage.postsThisMonth
+  )
+  
+  return {
+    channels: {
+      used: currentUsage.channels,
+      limit: channelOverageAllowed,
+      canAdd: currentUsage.channels < channelOverageAllowed
+    },
+    posts: {
+      used: currentUsage.postsThisMonth,
+      limit: limits.MAX_POSTS_PER_MONTH,
+      remaining: postsRemaining
+    }
+  }
+}
+
+// ✅ ПРАВИЛЬНО: TODO комментарии с контекстом
+async function registerCreativeInOrd(post: Post): Promise<string> {
+  // TODO: Добавить retry логику для случаев временной недоступности ОРД API
+  // Связано с задачей TGEASY-123: улучшение надежности интеграций
+  
+  // TODO: Кэшировать успешные регистрации для избежания дублей
+  // При повторной отправке того же креатива ОРД возвращает ошибку
+  
+  const response = await fetch('/api/ord/register', {
+    method: 'POST',
+    body: JSON.stringify(post)
+  })
+  
+  return response.json()
+}
+
+// ❌ НЕПРАВИЛЬНО: Очевидные или бесполезные комментарии
+function createPost(data: CreatePostData): Promise<Post> {
+  // Создаем пост
+  return postRepository.create(data) // ❌ Очевидно из кода
+}
+
+// ❌ НЕПРАВИЛЬНО: Закомментированный код
+function publishPost(postId: string) {
+  // const oldWay = await legacyPublisher.publish(postId)
+  // if (oldWay.success) {
+  //   return oldWay.result
+  // }
+  
+  return telegramService.publishPost(postId)
+}
+```
+
+### JSDoc Documentation
+```typescript
+// ✅ ПРАВИЛЬНО: Подробная JSDoc для публичных API
+/**
+ * Создает новое рекламное размещение с автоматической регистрацией в ОРД
+ * 
+ * @param data - Данные для создания размещения
+ * @param data.title - Заголовок размещения (1-255 символов)
+ * @param data.channelId - ID Telegram канала
+ * @param data.creative - Креативный контент
+ * @param data.advertiserInfo - Информация о рекламодателе для ОРД
+ * 
+ * @returns Promise с созданным размещением, включая ERID код
+ * 
+ * @throws {ValidationError} Если данные не прошли валидацию
+ * @throws {PermissionError} Если нет доступа к указанному каналу
+ * @throws {ORDError} Если регистрация в ОРД завершилась ошибкой
+ * 
+ * @example
+ * ```typescript
+ * const post = await createPost({
+ *   title: 'Реклама товара',
+ *   channelId: 'channel-123',
+ *   creative: {
+ *     text: 'Купите наш товар!',
+ *     images: ['https://example.com/image.jpg']
+ *   },
+ *   advertiserInfo: {
+ *     inn: '1234567890',
+ *     name: 'ООО Рекламщик',
+ *     productDescription: 'Описание товара'
+ *   }
+ * })
+ * ```
+ */
+async function createPost(data: CreatePostData): Promise<Post> {
+  // Implementation
+}
+
+// ✅ ПРАВИЛЬНО: JSDoc для сложных типов
+/**
+ * Конфигурация интеграции с внешними сервисами
+ * 
+ * @interface IntegrationConfig
+ * @property {string} apiKey - API ключ для аутентификации
+ * @property {number} timeout - Таймаут запросов в миллисекундах (по умолчанию 30000)
+ * @property {number} retries - Количество повторных попыток при ошибке (по умолчанию 3)
+ * @property {boolean} enableLogging - Включить детальное логирование запросов
+ */
+interface IntegrationConfig {
+  apiKey: string
+  timeout?: number
+  retries?: number
+  enableLogging?: boolean
+}
+```
+
+### Component Documentation
+```typescript
+// ✅ ПРАВИЛЬНО: Документация React компонентов
+/**
+ * Форма создания рекламного размещения
+ * 
+ * Компонент предоставляет полную форму для создания размещения,
+ * включая валидацию, превью и интеграцию с ОРД
+ * 
+ * @component
+ * @example
+ * ```tsx
+ * <PostForm
+ *   onSubmit={handleCreatePost}
+ *   onCancel={() => router.back()}
+ *   initialData={{ channelId: 'channel-123' }}
+ * />
+ * ```
+ */
+interface PostFormProps {
+  /** Callback при успешной отправке формы */
+  onSubmit: (data: CreatePostData) => Promise<void>
+  
+  /** Callback при отмене создания поста */
+  onCancel?: () => void
+  
+  /** Начальные данные для заполнения формы */
+  initialData?: Partial<CreatePostData>
+  
+  /** Отключить форму (показать loading состояние) */
+  disabled?: boolean
+}
+
+export function PostForm({
+  onSubmit,
+  onCancel,
+  initialData,
+  disabled = false
+}: PostFormProps) {
+  // Component implementation
+}
+```
+
+## 12. Testing Style
+
+### Test File Organization
+```typescript
+// ✅ ПРАВИЛЬНО: Структура test файла
+// __tests__/services/post-service.test.ts
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { postService } from '@/lib/services/post-service'
+import { postRepository } from '@/lib/repositories/post-repository'
+import { ordService } from '@/lib/integrations/ord/service'
+
+// Mock все внешние зависимости
+vi.mock('@/lib/repositories/post-repository')
+vi.mock('@/lib/integrations/ord/service')
+vi.mock('@/lib/services/notification-service')
+
+describe('PostService', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+  
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+  
+  describe('create', () => {
+    it('should create post with valid data', async () => {
+      // Arrange
+      const mockPostData: CreatePostData = {
+        title: 'Test Post',
+        channelId: 'channel-123',
+        userId: 'user-123',
+        creative: {
+          text: 'Test content',
+          images: []
+        },
+        advertiserInfo: {
+          inn: '1234567890',
+          name: 'Test Company',
+          productDescription: 'Test product'
+        }
+      }
+      
+      const mockCreatedPost: Post = {
+        id: 'post-123',
+        ...mockPostData,
+        status: 'draft',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+      
+      vi.mocked(postRepository.create).mockResolvedValue(mockCreatedPost)
+      vi.mocked(ordService.registerCreative).mockResolvedValue('erid-123')
+      
+      // Act
+      const result = await postService.create(mockPostData)
+      
+      // Assert
+      expect(result).toEqual(mockCreatedPost)
+      expect(postRepository.create).toHaveBeenCalledWith(mockPostData)
+      expect(ordService.registerCreative).toHaveBeenCalledWith(mockCreatedPost)
+    })
+    
+    it('should handle ОРД registration failure gracefully', async () => {
+      // Arrange
+      const mockPostData: CreatePostData = { /* ... */ }
+      const mockCreatedPost: Post = { /* ... */ }
+      
+      vi.mocked(postRepository.create).mockResolvedValue(mockCreatedPost)
+      vi.mocked(ordService.registerCreative).mockRejectedValue(
+        new Error('ОРД service unavailable')
+      )
+      
+      // Act
+      const result = await postService.create(mockPostData)
+      
+      // Assert
+      expect(result).toEqual(mockCreatedPost)
+      // Пост должен создаться даже если ОРД недоступен
+      expect(postRepository.create).toHaveBeenCalled()
+    })
+    
+    it('should throw error for invalid channel access', async () => {
+      // Arrange
+      const mockPostData: CreatePostData = { /* ... */ }
+      
+      vi.mocked(postService.validateChannelAccess).mockRejectedValue(
+        new Error('Access denied')
+      )
+      
+      // Act & Assert
+      await expect(postService.create(mockPostData)).rejects.toThrow('Access denied')
+    })
+  })
+})
+```
+
+### Component Testing
+```typescript
+// ✅ ПРАВИЛЬНО: Component test с user interactions
+// __tests__/components/post-form.test.tsx
+
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { PostForm } from '@/components/posts/post-form'
+import { usePosts } from '@/hooks/use-posts'
+
+// Mock hooks
+vi.mock('@/hooks/use-posts')
+
+describe('PostForm', () => {
+  const mockOnSubmit = vi.fn()
+  const mockCreate = vi.fn()
+  
+  beforeEach(() => {
+    vi.mocked(usePosts).mockReturnValue({
+      posts: [],
+      create: mockCreate,
+      isLoading: false,
+      error: null
+    })
+  })
+  
+  it('should render all form fields', () => {
+    render(<PostForm onSubmit={mockOnSubmit} />)
+    
+    expect(screen.getByLabelText(/title/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/channel/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/content/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /create/i })).toBeInTheDocument()
+  })
+  
+  it('should validate required fields', async () => {
+    const user = userEvent.setup()
+    
+    render(<PostForm onSubmit={mockOnSubmit} />)
+    
+    const submitButton = screen.getByRole('button', { name: /create/i })
+    await user.click(submitButton)
+    
+    expect(screen.getByText(/title is required/i)).toBeInTheDocument()
+    expect(mockOnSubmit).not.toHaveBeenCalled()
+  })
+  
+  it('should submit form with valid data', async () => {
+    const user = userEvent.setup()
+    mockCreate.mockResolvedValue({ id: 'post-123' })
+    
+    render(<PostForm onSubmit={mockOnSubmit} />)
+    
+    // Fill form
+    await user.type(screen.getByLabelText(/title/i), 'Test Post')
+    await user.selectOptions(screen.getByLabelText(/channel/i), 'channel-123')
+    await user.type(screen.getByLabelText(/content/i), 'Test content')
+    
+    // Submit
+    await user.click(screen.getByRole('button', { name: /create/i }))
+    
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith({
+        title: 'Test Post',
+        channelId: 'channel-123',
+        creative: { text: 'Test content' }
+      })
+    })
+  })
+})
+```
+
+### Test Naming
+```typescript
+// ✅ ПРАВИЛЬНО: Описательные названия тестов
+describe('PostService.create', () => {
+  it('should create post with ERID when ОРД registration succeeds', () => {})
+  it('should create post without ERID when ОРД registration fails', () => {})
+  it('should throw ValidationError for missing title', () => {})
+  it('should throw PermissionError for unauthorized channel access', () => {})
+  it('should send notification after successful post creation', () => {})
+})
+
+// ❌ НЕПРАВИЛЬНО: Неописательные названия
+describe('PostService', () => {
+  it('should work', () => {}) // ❌
+  it('test create', () => {}) // ❌
+  it('error case', () => {}) // ❌
+})
+```
+
+## 13. File Upload Guidelines
+
+### File Handling
+```typescript
+// ✅ ПРАВИЛЬНО: Безопасная обработка файлов
+async function uploadPostMedia(
+  file: File,
+  postId: string
+): Promise<{ url: string; publicUrl: string }> {
+  // Валидация типа файла
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error(`Unsupported file type: ${file.type}`)
+  }
+  
+  // Валидация размера
+  const maxSize = 5 * 1024 * 1024 // 5MB
+  if (file.size > maxSize) {
+    throw new Error(`File too large: ${file.size} bytes (max: ${maxSize})`)
+  }
+  
+  // Генерация безопасного имени файла
+  const fileExtension = file.name.split('.').pop()
+  const safeFileName = `posts/${postId}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExtension}`
+  
+  // Загрузка в Supabase Storage
+  const { data, error } = await supabase.storage
+    .from('media')
+    .upload(safeFileName, file, {
+      cacheControl: '3600',
+      upsert: false
+    })
+  
+  if (error) throw new Error(`Upload failed: ${error.message}`)
+  
+  const { data: { publicUrl } } = supabase.storage
+    .from('media')
+    .getPublicUrl(data.path)
+  
+  return {
+    url: data.path,
+    publicUrl
+  }
+}
+```
+
+### Progress Tracking
+```typescript
+// ✅ ПРАВИЛЬНО: Upload с progress tracking
+function useFileUpload() {
+  const [progress, setProgress] = useState(0)
+  const [isUploading, setIsUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
+  const upload = useCallback(async (file: File, postId: string) => {
+    setIsUploading(true)
+    setProgress(0)
+    setError(null)
+    
+    try {
+      // Simulate progress for demo
+      const interval = setInterval(() => {
+        setProgress(prev => Math.min(prev + 10, 90))
+      }, 100)
+      
+      const result = await uploadPostMedia(file, postId)
+      
+      clearInterval(interval)
+      setProgress(100)
+      
+      return result
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Upload failed'
+      setError(message)
+      throw err
+    } finally {
+      setIsUploading(false)
+    }
+  }, [])
+  
+  return { upload, progress, isUploading, error }
+}
+```
+
+## 14. Database Query Guidelines
+
+### Query Optimization
+```typescript
+// ✅ ПРАВИЛЬНО: Оптимизированные запросы
+class PostRepository {
+  // Используйте select() для выбора только нужных полей
+  async findPostsForDashboard(userId: string): Promise<PostSummary[]> {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        id,
+        title,
+        status,
+        created_at,
+        telegram_channels!inner(name),
+        post_analytics(views, clicks)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    
+    if (error) throw new Error(`Failed to fetch posts: ${error.message}`)
+    return data || []
+  }
+  
+  // Используйте фильтры для уменьшения объема данных
+  async findScheduledPosts(date: Date): Promise<Post[]> {
+    const startOfDay = new Date(date)
+    startOfDay.setHours(0, 0, 0, 0)
+    
+    const endOfDay = new Date(date)
+    endOfDay.setHours(23, 59, 59, 999)
+    
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('status', 'scheduled')
+      .gte('scheduled_at', startOfDay.toISOString())
+      .lte('scheduled_at', endOfDay.toISOString())
+    
+    if (error) throw new Error(`Failed to fetch scheduled posts: ${error.message}`)
+    return data || []
+  }
+}
+
+// ❌ НЕПРАВИЛЬНО: Неоптимизированные запросы
+class PostRepository {
+  // ❌ Выбор всех полей без необходимости
+  async findPostsForDashboard(userId: string): Promise<Post[]> {
+    const { data } = await supabase
+      .from('posts')
+      .select('*') // Получаем все поля, включая большие тексты
+      .eq('user_id', userId)
+    
+    return data || []
+  }
+  
+  // ❌ Фильтрация в JavaScript вместо SQL
+  async findDraftPosts(userId: string): Promise<Post[]> {
+    const { data } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('user_id', userId)
+    
+    return data?.filter(post => post.status === 'draft') || []
+  }
+}
+```
+
+### Transaction Patterns
+```typescript
+// ✅ ПРАВИЛЬНО: Использование транзакций для связанных операций
+async function createPostWithAnalytics(
+  postData: CreatePostData,
+  initialStats: PostStats
+): Promise<Post> {
+  const { data, error } = await supabase.rpc('create_post_with_analytics', {
+    post_data: postData,
+    initial_stats: initialStats
+  })
+  
+  if (error) throw new Error(`Transaction failed: ${error.message}`)
+  return data
+}
+
+// SQL function для транзакции
+/*
+CREATE OR REPLACE FUNCTION create_post_with_analytics(
+  post_data jsonb,
+  initial_stats jsonb
+) RETURNS posts AS $
+DECLARE
+  new_post posts;
+BEGIN
+  INSERT INTO posts (title, channel_id, user_id, creative, status)
+  VALUES (
+    post_data->>'title',
+    (post_data->>'channel_id')::uuid,
+    (post_data->>'user_id')::uuid,
+    post_data->'creative',
+    'draft'
+  )
+  RETURNING * INTO new_post;
+  
+  INSERT INTO post_analytics (post_id, views, clicks, created_at)
+  VALUES (
+    new_post.id,
+    (initial_stats->>'views')::integer,
+    (initial_stats->>'clicks')::integer,
+    NOW()
+  );
+  
+  RETURN new_post;
+END;
+$ LANGUAGE plpgsql;
+*/
+```
+
+## 15. Environment Configuration
+
+### Configuration Management
+```typescript
+// ✅ ПРАВИЛЬНО: Типизированная конфигурация
+// lib/config.ts
+import { z } from 'zod'
+
+const configSchema = z.object({
+  // App
+  NODE_ENV: z.enum(['development', 'production', 'test']),
+  APP_URL: z.string().url(),
+  
+  // Database
+  DATABASE_URL: z.string().min(1),
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_ANON_KEY: z.string().min(1),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  
+  // Integrations
+  TELEGRAM_BOT_TOKEN: z.string().min(1),
+  ORD_API_KEY: z.string().min(1),
+  ORD_CLIENT_ID: z.string().min(1),
+  YOOKASSA_SHOP_ID: z.string().min(1),
+  YOOKASSA_SECRET_KEY: z.string().min(1),
+  
+  // Optional
+  ENABLE_ANALYTICS: z.string().optional().default('true'),
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional().default('info')
+})
+
+export const config = configSchema.parse(process.env)
+
+// Typed access к конфигурации
+export const isDevelopment = config.NODE_ENV === 'development'
+export const isProduction = config.NODE_ENV === 'production'
+```
+
+### Environment Validation
+```typescript
+// ✅ ПРАВИЛЬНО: Early validation при старте приложения
+// lib/env-validation.ts
+export function validateEnvironment(): void {
+  const requiredVars = [
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'TELEGRAM_BOT_TOKEN',
+    'ORD_API_KEY',
+    'YOOKASSA_SECRET_KEY'
+  ]
+  
+  const missingVars = requiredVars.filter(varName => !process.env[varName])
+  
+  if (missingVars.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missingVars.join(', ')}\n` +
+      'Please check your .env.local file'
+    )
+  }
+  
+  // Validate URLs
+  try {
+    new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!)
+  } catch {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL must be a valid URL')
+  }
+  
+  console.log('✅ Environment validation passed')
+}
+
+// Вызов при старте приложения
+if (typeof window === 'undefined') {
+  validateEnvironment()
+}
+```
+
+## 16. Security Practices
+
+### Input Sanitization
+```typescript
+// ✅ ПРАВИЛЬНО: Валидация и санитизация входных данных
+import DOMPurify from 'isomorphic-dompurify'
+import { z } from 'zod'
+
+const PostContentSchema = z.object({
+  text: z.string()
+    .min(1, 'Content is required')
+    .max(4096, 'Content too long')
+    .refine(
+      text => !text.includes('<script>'),
+      'Script tags are not allowed'
+    ),
+  images: z.array(z.string().url()).max(10),
+  targetUrl: z.string().url().optional()
+})
+
+function sanitizePostContent(content: string): string {
+  // Удаляем потенциально опасные теги, но оставляем разрешенные
+  return DOMPurify.sanitize(content, {
+    ALLOWED_TAGS: ['b', 'i', 'u', 'a', 'br'],
+    ALLOWED_ATTR: ['href']
+  })
+}
+
+function validateAndSanitizePost(data: unknown): CreatePostData {
+  const validated = PostContentSchema.parse(data)
+  
+  return {
+    ...validated,
+    creative: {
+      ...validated.creative,
+      text: sanitizePostContent(validated.creative.text)
+    }
+  }
+}
+```
+
+### Rate Limiting
+```typescript
+// ✅ ПРАВИЛЬНО: Rate limiting для API endpoints
+// lib/rate-limit.ts
+interface RateLimitConfig {
+  requests: number
+  window: number // milliseconds
+}
+
+class RateLimit {
+  private requests = new Map<string, number[]>()
+  
+  constructor(private config: RateLimitConfig) {}
+  
+  check(identifier: string): { allowed: boolean; resetTime?: number } {
+    const now = Date.now()
+    const windowStart = now - this.config.window
+    
+    // Получаем timestamps запросов для пользователя
+    const userRequests = this.requests.get(identifier) || []
+    
+    // Фильтруем запросы в текущем окне
+    const recentRequests = userRequests.filter(time => time > windowStart)
+    
+    if (recentRequests.length >= this.config.requests) {
+      const oldestRequest = Math.min(...recentRequests)
+      const resetTime = oldestRequest + this.config.window
+      
+      return { allowed: false, resetTime }
+    }
+    
+    // Добавляем текущий запрос
+    recentRequests.push(now)
+    this.requests.set(identifier, recentRequests)
+    
+    return { allowed: true }
+  }
+}
+
+// Использование в API route
+const postCreationLimit = new RateLimit({ requests: 5, window: 60000 }) // 5 requests per minute
+
+export async function POST(request: NextRequest) {
+  const user = await getCurrentUser(request)
+  if (!user) return new Response('Unauthorized', { status: 401 })
+  
+  const rateLimitResult = postCreationLimit.check(user.id)
+  if (!rateLimitResult.allowed) {
+    return new Response('Rate limit exceeded', {
+      status: 429,
+      headers: {
+        'Retry-After': String(Math.ceil((rateLimitResult.resetTime! - Date.now()) / 1000))
+      }
+    })
+  }
+  
+  // Process request...
+}
+```
+
+## 17. ESLint и Prettier Configuration
+
+### ESLint Config
+```json
+// .eslintrc.json
+{
+  "extends": [
+    "next/core-web-vitals",
+    "@typescript-eslint/recommended",
+    "@typescript-eslint/recommended-requiring-type-checking"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  },
+  "plugins": ["@typescript-eslint"],
+  "rules": {
+    // TypeScript
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/prefer-const": "error",
+    "@typescript-eslint/no-non-null-assertion": "warn",
+    
+    // React
+    "react-hooks/exhaustive-deps": "error",
+    "react/jsx-curly-brace-presence": ["error", "never"],
+    
+    // General
+    "prefer-const": "error",
+    "no-var": "error",
+    "object-shorthand": "error",
+    "prefer-template": "error",
+    
+    // TGeasy specific
+    "no-console": ["warn", { "allow": ["error", "warn"] }],
+    "max-lines-per-function": ["error", { "max": 50 }],
+    "complexity": ["error", { "max": 10 }]
+  }
+}
+```
+
+### Prettier Config
+```json
+// .prettierrc
+{
+  "semi": false,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "bracketSpacing": true,
+  "bracketSameLine": false,
+  "arrowParens": "avoid",
+  "endOfLine": "lf"
+}
+```
+
+## 18. Final Code Quality Checklist
+
+### Pre-commit Checklist
+Перед каждым коммитом убедитесь:
+
+**TypeScript:**
+- [ ] Нет TypeScript ошибок (`npm run type-check`)
+- [ ] Все типы explicit (нет inferred `any`)
+- [ ] Используются utility types где нужно
+
+**Code Style:**
+- [ ] ESLint проходит без ошибок (`npm run lint`)
+- [ ] Prettier отформатировал код (`npm run format`)
+- [ ] Naming conventions соблюдены
+- [ ] Максимум 20 строк на функцию
+
+**Performance:**
+- [ ] Нет N+1 запросов к базе
+- [ ] React.memo используется для тяжелых компонентов
+- [ ] useCallback/useMemo используются правильно
+- [ ] Изображения оптимизированы
+
+**Security:**
+- [ ] Входные данные валидируются с Zod
+- [ ] SQL injection невозможен (используется Supabase client)
+- [ ] XSS защита на месте
+- [ ] Секреты не в client-side коде
+
+**Accessibility:**
+- [ ] Семантичная HTML разметка
+- [ ] ARIA атрибуты где нужно
+- [ ] Keyboard navigation работает
+- [ ] Color contrast соответствует WCAG-AA
+
+**Testing:**
+- [ ] Unit тесты написаны для новой логики
+- [ ] Все тесты проходят (`npm run test`)
+- [ ] Coverage не уменьшился
+
+---
+
+**Помните**: Эти стандарты созданы для обеспечения высокого качества кода и эффективной работы с AI-инструментами. Следование им критически важно для успеха проекта TGeasy.

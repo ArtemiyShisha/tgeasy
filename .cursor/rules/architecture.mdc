@@ -1,0 +1,1188 @@
+# Архитектурные правила TGeasy для AI-инструментов
+
+Этот документ содержит строгие архитектурные правила и паттерны для разработки TGeasy с использованием Cursor/Windsurf. Следуйте этим правилам для обеспечения консистентности кода.
+
+## 1. Структура проекта
+
+### Организация файлов
+```
+app/
+├── (auth)/                 # Route groups в скобках
+├── (dashboard)/            # Защищенные маршруты
+├── api/                    # API routes только здесь
+└── globals.css             # Только один global CSS
+
+components/
+├── ui/                     # Только shadcn/ui компоненты
+├── auth/                   # Domain-specific компоненты
+├── channels/               # По одной папке на домен
+└── [domain]/               # Всегда группировать по доменам
+
+lib/
+├── supabase/              # Database related
+├── telegram/              # Integration specific
+├── ord/                   # Integration specific
+├── yookassa/             # Integration specific
+└── utils/                # Shared utilities
+
+types/
+├── database.ts           # Supabase generated types
+├── api.ts               # API response types
+└── [domain].ts          # Domain specific types
+```
+
+### Правила именования файлов
+- **API routes**: `route.ts` (не `index.ts`)
+- **React pages**: `page.tsx` (Next.js 14 App Router)
+- **Components**: `kebab-case.tsx` для файлов, `PascalCase` для экспорта
+- **Hooks**: `use-entity-name.ts`
+- **Services**: `entity-service.ts`
+- **Types**: `entity.ts` или `entity-types.ts`
+
+## 2. TypeScript правила
+
+### Строгая типизация
+```typescript
+// ✅ ПРАВИЛЬНО: Всегда используйте строгие типы
+interface CreatePostData {
+  title: string
+  channelId: string
+  contractId?: string
+  creative: {
+    text: string
+    images: string[]
+    targetUrl?: string
+  }
+  advertiserInfo: {
+    inn: string
+    name: string
+    productDescription: string
+  }
+}
+
+// ❌ НЕПРАВИЛЬНО: Избегайте any
+function createPost(data: any) { }
+```
+
+### Utility types
+```typescript
+// ✅ Используйте утилитарные типы
+type UpdatePostData = Partial<Omit<CreatePostData, 'id' | 'createdAt'>>
+type PostResponse = Pick<Post, 'id' | 'title' | 'status' | 'createdAt'>
+
+// ✅ Enum для статусов
+enum PostStatus {
+  DRAFT = 'draft',
+  SCHEDULED = 'scheduled',
+  PUBLISHED = 'published',
+  FAILED = 'failed'
+}
+```
+
+### Generic patterns
+```typescript
+// ✅ Шаблон для API responses
+interface ApiResponse<T> {
+  data: T
+  error?: string
+  meta?: {
+    total?: number
+    page?: number
+    limit?: number
+  }
+}
+
+// ✅ Шаблон для Repository
+interface Repository<T, CreateDTO, UpdateDTO> {
+  create(data: CreateDTO): Promise<T>
+  findById(id: string): Promise<T | null>
+  findMany(filters?: Record<string, any>): Promise<T[]>
+  update(id: string, data: UpdateDTO): Promise<T>
+  delete(id: string): Promise<void>
+}
+```
+
+## 3. Backend паттерны
+
+### API Route structure
+```typescript
+// ✅ Стандартная структура API route
+// app/api/posts/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { getCurrentUser } from '@/lib/auth'
+import { postService } from '@/lib/services/post-service'
+
+const CreatePostSchema = z.object({
+  title: z.string().min(1).max(255),
+  channelId: z.string().uuid(),
+  // ... other fields
+})
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const posts = await postService.findByUserId(user.id)
+    return NextResponse.json({ data: posts })
+  } catch (error) {
+    console.error('GET /api/posts error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const validatedData = CreatePostSchema.parse(body)
+
+    const post = await postService.create({
+      ...validatedData,
+      userId: user.id
+    })
+
+    return NextResponse.json({ data: post }, { status: 201 })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.errors },
+        { status: 400 }
+      )
+    }
+    
+    console.error('POST /api/posts error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+```
+
+### Service Layer pattern
+```typescript
+// ✅ Стандартная структура сервиса
+// lib/services/post-service.ts
+import { postRepository } from '@/lib/repositories/post-repository'
+import { ordService } from '@/lib/integrations/ord/service'
+import { notificationService } from '@/lib/services/notification-service'
+import type { CreatePostData, Post } from '@/types/post'
+
+class PostService {
+  async create(data: CreatePostData): Promise<Post> {
+    // 1. Validate channel access
+    await this.validateChannelAccess(data.channelId, data.userId)
+    
+    // 2. Create post
+    const post = await postRepository.create(data)
+    
+    // 3. Register with ОРД
+    try {
+      const erid = await ordService.registerCreative(post)
+      await postRepository.update(post.id, { erid })
+    } catch (error) {
+      console.error('ОРД registration failed:', error)
+      // Continue without ОРД for now
+    }
+    
+    // 4. Send notification
+    await notificationService.sendPostCreated(post)
+    
+    return post
+  }
+
+  async findByUserId(userId: string): Promise<Post[]> {
+    return postRepository.findByUserId(userId)
+  }
+
+  private async validateChannelAccess(channelId: string, userId: string): Promise<void> {
+    const hasAccess = await channelService.checkUserAccess(channelId, userId)
+    if (!hasAccess) {
+      throw new Error('Access denied to channel')
+    }
+  }
+}
+
+export const postService = new PostService()
+```
+
+### Repository pattern
+```typescript
+// ✅ Стандартная структура репозитория
+// lib/repositories/post-repository.ts
+import { supabase } from '@/lib/supabase/client'
+import type { CreatePostData, UpdatePostData, Post } from '@/types/post'
+
+class PostRepository {
+  async create(data: CreatePostData): Promise<Post> {
+    const { data: post, error } = await supabase
+      .from('posts')
+      .insert(data)
+      .select()
+      .single()
+
+    if (error) throw new Error(`Failed to create post: ${error.message}`)
+    return post
+  }
+
+  async findById(id: string): Promise<Post | null> {
+    const { data: post, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // Not found
+      throw new Error(`Failed to find post: ${error.message}`)
+    }
+    
+    return post
+  }
+
+  async findByUserId(userId: string): Promise<Post[]> {
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw new Error(`Failed to find posts: ${error.message}`)
+    return posts || []
+  }
+
+  async update(id: string, data: UpdatePostData): Promise<Post> {
+    const { data: post, error } = await supabase
+      .from('posts')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw new Error(`Failed to update post: ${error.message}`)
+    return post
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw new Error(`Failed to delete post: ${error.message}`)
+  }
+}
+
+export const postRepository = new PostRepository()
+```
+
+## 4. Frontend паттерны
+
+### React Hooks pattern
+```typescript
+// ✅ Стандартная структура хука для CRUD операций
+// hooks/use-posts.ts
+import useSWR from 'swr'
+import { useCallback } from 'react'
+import type { Post, CreatePostData, UpdatePostData } from '@/types/post'
+
+const fetcher = (url: string) => fetch(url).then(r => r.json())
+
+export function usePosts() {
+  const { data, error, isLoading, mutate } = useSWR<{ data: Post[] }>('/api/posts', fetcher)
+
+  const create = useCallback(async (postData: CreatePostData): Promise<Post> => {
+    const response = await fetch('/api/posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(postData)
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to create post')
+    }
+
+    const result = await response.json()
+    mutate() // Revalidate cache
+    return result.data
+  }, [mutate])
+
+  const update = useCallback(async (id: string, postData: UpdatePostData): Promise<Post> => {
+    const response = await fetch(`/api/posts/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(postData)
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to update post')
+    }
+
+    const result = await response.json()
+    mutate() // Revalidate cache
+    return result.data
+  }, [mutate])
+
+  const remove = useCallback(async (id: string): Promise<void> => {
+    const response = await fetch(`/api/posts/${id}`, {
+      method: 'DELETE'
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to delete post')
+    }
+
+    mutate() // Revalidate cache
+  }, [mutate])
+
+  return {
+    posts: data?.data || [],
+    error,
+    isLoading,
+    create,
+    update,
+    remove,
+    refresh: mutate
+  }
+}
+```
+
+### Component structure
+```typescript
+// ✅ Стандартная структура компонента
+// components/posts/post-form.tsx
+'use client'
+
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { Button } from '@/components/ui/button'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { usePosts } from '@/hooks/use-posts'
+import type { CreatePostData } from '@/types/post'
+
+const PostFormSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(255, 'Title too long'),
+  channelId: z.string().uuid('Invalid channel'),
+  creative: z.object({
+    text: z.string().min(1, 'Post text is required').max(4096, 'Text too long'),
+    images: z.array(z.string().url()).default([]),
+    targetUrl: z.string().url().optional().or(z.literal(''))
+  })
+})
+
+type PostFormData = z.infer<typeof PostFormSchema>
+
+interface PostFormProps {
+  onSuccess?: (post: Post) => void
+  onCancel?: () => void
+}
+
+export function PostForm({ onSuccess, onCancel }: PostFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { create } = usePosts()
+
+  const form = useForm<PostFormData>({
+    resolver: zodResolver(PostFormSchema),
+    defaultValues: {
+      title: '',
+      channelId: '',
+      creative: {
+        text: '',
+        images: [],
+        targetUrl: ''
+      }
+    }
+  })
+
+  const onSubmit = async (data: PostFormData) => {
+    setIsSubmitting(true)
+    try {
+      const post = await create(data as CreatePostData)
+      form.reset()
+      onSuccess?.(post)
+    } catch (error) {
+      console.error('Failed to create post:', error)
+      // Handle error (show toast, etc.)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Title</FormLabel>
+              <FormControl>
+                <Input placeholder="Enter post title..." {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        {/* More fields... */}
+        
+        <div className="flex justify-end space-x-4">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Creating...' : 'Create Post'}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  )
+}
+```
+
+### Page structure
+```typescript
+// ✅ Стандартная структура страницы
+// app/(dashboard)/posts/page.tsx
+import { Metadata } from 'next'
+import { PostsList } from '@/components/posts/posts-list'
+import { CreatePostButton } from '@/components/posts/create-post-button'
+
+export const metadata: Metadata = {
+  title: 'Posts | TGeasy',
+  description: 'Manage your advertising posts'
+}
+
+export default function PostsPage() {
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Posts</h1>
+          <p className="text-muted-foreground">
+            Manage your advertising posts and campaigns
+          </p>
+        </div>
+        <CreatePostButton />
+      </div>
+      
+      <PostsList />
+    </div>
+  )
+}
+```
+
+## 5. Database паттерны
+
+### Supabase client usage
+```typescript
+// ✅ Правильное использование Supabase клиента
+// lib/supabase/client.ts
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+
+// lib/supabase/server.ts - для server-side операций
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceKey)
+```
+
+### RLS queries
+```typescript
+// ✅ Всегда используйте RLS-безопасные запросы
+async function getUserPosts(userId: string) {
+  const { data, error } = await supabase
+    .from('posts')
+    .select('*')
+    .eq('user_id', userId) // RLS автоматически проверит доступ
+    
+  if (error) throw error
+  return data
+}
+
+// ✅ Для админских операций используйте supabaseAdmin
+async function adminGetAllPosts() {
+  const { data, error } = await supabaseAdmin
+    .from('posts')
+    .select('*')
+    
+  if (error) throw error
+  return data
+}
+```
+
+## 6. Validation patterns
+
+### Zod schemas
+```typescript
+// ✅ Стандартные Zod схемы
+// schemas/post-schemas.ts
+import { z } from 'zod'
+
+export const CreatePostSchema = z.object({
+  title: z.string().min(1).max(255),
+  channelId: z.string().uuid(),
+  contractId: z.string().uuid().optional(),
+  creative: z.object({
+    text: z.string().min(1).max(4096),
+    images: z.array(z.string().url()).max(10),
+    targetUrl: z.string().url().optional()
+  }),
+  advertiserInfo: z.object({
+    inn: z.string().regex(/^\d{10,12}$/, 'Invalid INN format'),
+    name: z.string().min(1).max(255),
+    productDescription: z.string().min(1).max(500)
+  }),
+  scheduledAt: z.date().optional()
+})
+
+export const UpdatePostSchema = CreatePostSchema.partial()
+
+export type CreatePostData = z.infer<typeof CreatePostSchema>
+export type UpdatePostData = z.infer<typeof UpdatePostSchema>
+```
+
+## 7. Error handling
+
+### API error handling
+```typescript
+// ✅ Стандартная обработка ошибок в API
+export async function POST(request: NextRequest) {
+  try {
+    // ... main logic
+  } catch (error) {
+    console.error('API Error:', error)
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.errors },
+        { status: 400 }
+      )
+    }
+    
+    if (error instanceof Error) {
+      if (error.message.includes('permission denied')) {
+        return NextResponse.json(
+          { error: 'Access denied' },
+          { status: 403 }
+        )
+      }
+      
+      if (error.message.includes('not found')) {
+        return NextResponse.json(
+          { error: 'Resource not found' },
+          { status: 404 }
+        )
+      }
+    }
+    
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+```
+
+### Frontend error handling
+```typescript
+// ✅ Обработка ошибок в компонентах
+import { toast } from 'sonner'
+
+const handleCreatePost = async (data: CreatePostData) => {
+  try {
+    const post = await create(data)
+    toast.success('Post created successfully')
+    return post
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to create post'
+    toast.error(message)
+    throw error
+  }
+}
+```
+
+## 8. Integration patterns
+
+### External API integration
+```typescript
+// ✅ Стандартная структура интеграции
+// lib/integrations/telegram/service.ts
+class TelegramService {
+  private botToken: string
+  private baseUrl = 'https://api.telegram.org/bot'
+
+  constructor(botToken: string) {
+    this.botToken = botToken
+  }
+
+  async sendMessage(chatId: string, text: string): Promise<TelegramMessage> {
+    const response = await fetch(`${this.baseUrl}${this.botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML'
+      })
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(`Telegram API error: ${error.description}`)
+    }
+
+    const result = await response.json()
+    return result.result
+  }
+
+  async getChannelInfo(channelId: string): Promise<ChannelInfo> {
+    // Implementation...
+  }
+}
+
+export const telegramService = new TelegramService(process.env.TELEGRAM_BOT_TOKEN!)
+```
+
+## 9. Performance patterns
+
+### Caching
+```typescript
+// ✅ Простая память кэширования
+class CacheService {
+  private cache = new Map<string, { data: any, expiry: number }>()
+
+  set(key: string, data: any, ttlSeconds: number): void {
+    this.cache.set(key, {
+      data,
+      expiry: Date.now() + (ttlSeconds * 1000)
+    })
+  }
+
+  get<T>(key: string): T | null {
+    const item = this.cache.get(key)
+    if (!item) return null
+    
+    if (item.expiry < Date.now()) {
+      this.cache.delete(key)
+      return null
+    }
+    
+    return item.data
+  }
+}
+
+export const cacheService = new CacheService()
+```
+
+### SWR configuration
+```typescript
+// ✅ Оптимизированная конфигурация SWR
+// lib/swr-config.ts
+import { SWRConfig } from 'swr'
+
+const fetcher = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('API request failed')
+  return response.json()
+}
+
+export const swrConfig = {
+  fetcher,
+  revalidateOnFocus: false,
+  revalidateOnReconnect: true,
+  refreshInterval: 300000, // 5 minutes
+  errorRetryCount: 3,
+  errorRetryInterval: 5000
+}
+```
+
+## 10. Security patterns
+
+### Authentication check
+```typescript
+// ✅ Получение текущего пользователя
+// lib/auth/get-current-user.ts
+import { NextRequest } from 'next/server'
+import { supabase } from '@/lib/supabase/server'
+
+export async function getCurrentUser(request: NextRequest) {
+  const token = request.headers.get('authorization')?.replace('Bearer ', '')
+  
+  if (!token) return null
+
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  
+  if (error || !user) return null
+  
+  return user
+}
+```
+
+### Permission checks
+```typescript
+// ✅ Проверка прав доступа к каналу
+export async function checkChannelAccess(
+  userId: string, 
+  channelId: string, 
+  requiredRole: 'owner' | 'admin' = 'admin'
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('channel_permissions')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('channel_id', channelId)
+    .single()
+
+  if (!data) return false
+  
+  if (requiredRole === 'owner') {
+    return data.role === 'owner'
+  }
+  
+  return data.role === 'owner' || data.role === 'admin'
+}
+```
+
+## 11. Testing patterns
+
+### Unit test structure
+```typescript
+// ✅ Стандартная структура unit теста
+// __tests__/services/post-service.test.ts
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { postService } from '@/lib/services/post-service'
+import { postRepository } from '@/lib/repositories/post-repository'
+
+vi.mock('@/lib/repositories/post-repository')
+vi.mock('@/lib/integrations/ord/service')
+
+describe('PostService', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('create', () => {
+    it('should create a post successfully', async () => {
+      const mockPost = { id: '1', title: 'Test Post' }
+      vi.mocked(postRepository.create).mockResolvedValue(mockPost)
+
+      const result = await postService.create({
+        title: 'Test Post',
+        channelId: 'channel-1',
+        userId: 'user-1'
+      })
+
+      expect(result).toEqual(mockPost)
+      expect(postRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Test Post' })
+      )
+    })
+
+    it('should handle validation errors', async () => {
+      vi.mocked(postRepository.create).mockRejectedValue(
+        new Error('Validation failed')
+      )
+
+      await expect(postService.create({} as any)).rejects.toThrow('Validation failed')
+    })
+  })
+})
+```
+
+## 12. Общие правила
+
+### DO's ✅
+- Всегда используйте TypeScript строгий режим
+- Валидируйте все входные данные с Zod
+- Используйте Repository pattern для database операций
+- Группируйте компоненты по доменам
+- Обрабатывайте ошибки на всех уровнях
+- Используйте React Hook Form для форм
+- Кэшируйте тяжелые запросы
+- Следуйте принципам SOLID
+- Используйте shadcn/ui компоненты
+- Документируйте сложную бизнес-логику
+
+### DON'Ts ❌
+- Не используйте `any` типы
+- Не делайте прямые запросы к database в компонентах
+- Не создавайте глобальные CSS классы
+- Не храните секреты в client-side коде
+- Не игнорируйте TypeScript ошибки
+- Не используйте `useEffect` для API запросов (используйте SWR)
+- Не создавайте компоненты больше 200 строк
+- Не смешивайте business logic с UI logic
+
+### Соглашения об именовании
+```typescript
+// ✅ Компоненты: PascalCase
+export function PostForm() {}
+
+// ✅ Hooks: camelCase с префиксом 'use'
+export function usePosts() {}
+
+// ✅ Services: camelCase с суффиксом 'Service'
+export const postService = new PostService()
+
+// ✅ Types/Interfaces: PascalCase
+interface CreatePostData {}
+type PostStatus = 'draft' | 'published'
+
+// ✅ Constants: SCREAMING_SNAKE_CASE
+const MAX_FILE_SIZE = 5 * 1024 * 1024
+
+// ✅ API routes: kebab-case
+// /api/posts/scheduled-posts
+
+// ✅ Database tables: snake_case
+// posts, user_channels, post_analytics
+```
+
+## 13. MCP интеграция правила
+
+### UI Requirements документация
+```markdown
+// ✅ Формат UI requirements для MCP
+# UI Requirements: Component Name
+
+## Layout
+- Описание основного layout
+- Responsive поведение
+- Spacing и alignment
+
+## Components
+- Список необходимых shadcn/ui компонентов
+- Custom компоненты если нужны
+- Composition patterns
+
+## Interactions
+- User interactions
+- Loading states
+- Error handling
+- Success feedback
+
+## Data Integration
+- Какие hooks использовать
+- Expected data format
+- Error handling
+
+## Accessibility
+- ARIA labels
+- Keyboard navigation
+- Screen reader support
+```
+
+### MCP конфигурация
+```json
+// ✅ Структура MCP конфигурации
+{
+  "extends": "./mcp-config.json",
+  "domain": "posts",
+  "components": {
+    "form": {
+      "validation": "zod",
+      "formLibrary": "react-hook-form",
+      "styling": "shadcn"
+    },
+    "list": {
+      "pagination": true,
+      "filtering": true,
+      "sorting": true
+    }
+  },
+  "integrations": {
+    "api": "/api/posts",
+    "hooks": "use-posts"
+  }
+}
+```
+
+## 14. Code quality правила
+
+### Complexity limits
+- **Functions**: максимум 20 строк
+- **Components**: максимум 200 строк  
+- **Files**: максимум 500 строк
+- **Cyclomatic complexity**: максимум 10
+
+### Code organization
+```typescript
+// ✅ Порядок импортов
+// 1. React и Next.js
+import React from 'react'
+import { NextRequest } from 'next/server'
+
+// 2. External libraries
+import { z } from 'zod'
+import useSWR from 'swr'
+
+// 3. Internal utilities и types
+import { supabase } from '@/lib/supabase'
+import type { Post } from '@/types/post'
+
+// 4. Components
+import { Button } from '@/components/ui/button'
+import { PostForm } from '@/components/posts/post-form'
+
+// 5. Local imports
+import './styles.css'
+```
+
+### Documentation requirements
+```typescript
+// ✅ Документируйте сложную бизнес-логику
+/**
+ * Calculates subscription usage limits based on plan
+ * 
+ * @param plan - User subscription plan
+ * @param currentUsage - Current month usage stats
+ * @returns Usage limits and remaining quotas
+ */
+function calculateUsageLimits(
+  plan: SubscriptionPlan, 
+  currentUsage: UsageStats
+): UsageLimits {
+  // Implementation...
+}
+
+// ✅ Документируйте API endpoints
+/**
+ * POST /api/posts
+ * 
+ * Creates a new advertising post
+ * 
+ * @body CreatePostData - Post data including creative content
+ * @returns Post - Created post with generated ID and ERID
+ * @throws 400 - Validation error
+ * @throws 403 - Channel access denied
+ * @throws 500 - Internal server error
+ */
+```
+
+## 15. Environment и Configuration
+
+### Environment variables
+```typescript
+// ✅ Environment validation
+// lib/env.ts
+import { z } from 'zod'
+
+const envSchema = z.object({
+  // Supabase
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  
+  // Telegram
+  TELEGRAM_BOT_TOKEN: z.string().min(1),
+  
+  // ОРД
+  ORD_API_KEY: z.string().min(1),
+  ORD_CLIENT_ID: z.string().min(1),
+  
+  // ЮКасса
+  YOOKASSA_SHOP_ID: z.string().min(1),
+  YOOKASSA_SECRET_KEY: z.string().min(1),
+  
+  // App
+  NODE_ENV: z.enum(['development', 'production', 'test']),
+  NEXTAUTH_SECRET: z.string().min(32),
+  NEXTAUTH_URL: z.string().url()
+})
+
+export const env = envSchema.parse(process.env)
+```
+
+### Configuration patterns
+```typescript
+// ✅ Typed configuration
+// lib/config.ts
+export const config = {
+  app: {
+    name: 'TGeasy',
+    version: '1.0.0',
+    env: env.NODE_ENV
+  },
+  
+  api: {
+    timeout: 30000,
+    retries: 3,
+    rateLimit: {
+      requests: 100,
+      window: 60000 // 1 minute
+    }
+  },
+  
+  subscriptions: {
+    plans: {
+      basic: {
+        price: 3490,
+        channels: 5,
+        posts: 50
+      },
+      professional: {
+        price: 6990,
+        channels: 15,
+        posts: 200
+      },
+      corporate: {
+        price: 12990,
+        channels: 50,
+        posts: 1000
+      }
+    }
+  },
+  
+  telegram: {
+    apiUrl: 'https://api.telegram.org/bot',
+    maxRetries: 3,
+    timeout: 10000
+  }
+} as const
+```
+
+## 16. Deployment и Production правила
+
+### Build optimization
+```typescript
+// ✅ next.config.js оптимизация
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    serverComponentsExternalPackages: ['@supabase/supabase-js']
+  },
+  
+  images: {
+    domains: ['supabase.co'],
+    formats: ['image/webp', 'image/avif']
+  },
+  
+  env: {
+    CUSTOM_KEY: process.env.CUSTOM_KEY
+  },
+  
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false
+      }
+    }
+    return config
+  }
+}
+
+module.exports = nextConfig
+```
+
+### Monitoring setup
+```typescript
+// ✅ Error tracking
+// lib/monitoring.ts
+class MonitoringService {
+  static trackError(error: Error, context?: Record<string, any>) {
+    console.error('Application Error:', {
+      message: error.message,
+      stack: error.stack,
+      context,
+      timestamp: new Date().toISOString(),
+      url: window?.location?.href
+    })
+    
+    // In production, send to monitoring service
+    if (process.env.NODE_ENV === 'production') {
+      // Send to Sentry, LogRocket, etc.
+    }
+  }
+  
+  static trackPerformance(name: string, duration: number) {
+    console.log('Performance Metric:', {
+      name,
+      duration,
+      timestamp: new Date().toISOString()
+    })
+  }
+}
+```
+
+## 17. Заключительные принципы
+
+### Архитектурные принципы для AI
+1. **Predictability** - код должен быть предсказуемым для AI
+2. **Consistency** - используйте одинаковые паттерны везде
+3. **Explicitness** - явно указывайте типы и интерфейсы
+4. **Modularity** - разбивайте на небольшие, независимые модули
+5. **Testability** - код должен легко тестироваться
+
+### Паттерны для лучшей работы с AI
+```typescript
+// ✅ Четкие интерфейсы
+interface ServiceDependencies {
+  repository: PostRepository
+  ordService: ORDService
+  notificationService: NotificationService
+}
+
+// ✅ Explicit error types
+class ValidationError extends Error {
+  constructor(public field: string, message: string) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
+
+// ✅ Functional approach где возможно
+const validatePost = (post: CreatePostData): ValidationResult => {
+  if (!post.title) return { valid: false, error: 'Title required' }
+  if (post.title.length > 255) return { valid: false, error: 'Title too long' }
+  return { valid: true }
+}
+```
+
+### Финальный чек-лист
+Перед коммитом убедитесь:
+- [ ] TypeScript компилируется без ошибок
+- [ ] ESLint не показывает ошибок
+- [ ] Все тесты проходят
+- [ ] Код следует naming conventions
+- [ ] Добавлена документация для сложной логики
+- [ ] Ошибки обрабатываются gracefully
+- [ ] Performance оптимизирован
+- [ ] Security правила соблюдены
+
+---
+
+**Помните**: Эти правила созданы для обеспечения консистентности и качества кода при работе с AI-инструментами. Следуйте им строго для получения лучших результатов.

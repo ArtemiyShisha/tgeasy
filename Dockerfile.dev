@@ -1,0 +1,35 @@
+FROM node:18-alpine
+
+RUN apk add --no-cache \
+    libc6-compat \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/cache/apk/*
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY yarn.lock* ./
+
+RUN yarn install --frozen-lockfile && \
+    yarn cache clean
+
+COPY --chown=nextjs:nodejs . .
+
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+
+RUN chown -R nextjs:nodejs /app
+USER nextjs
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
+
+CMD ["yarn", "dev"]

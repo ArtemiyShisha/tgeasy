@@ -1,0 +1,104 @@
+# Docker Compose для разработки TGeasy
+version: '3.8'
+
+services:
+  # Next.js приложение
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: tgeasy-app
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_SUPABASE_URL=http://localhost:8000
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/tgeasy
+      - REDIS_URL=redis://redis:6379
+      - TELEGRAM_BOT_TOKEN=1234567890:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      - ORD_API_KEY=test_ord_api_key
+      - ORD_CLIENT_ID=test_ord_client
+      - YOOKASSA_SHOP_ID=123456
+      - YOOKASSA_SECRET_KEY=test_yookassa_key
+      - NEXTAUTH_SECRET=super-secret-jwt-token-for-development-only
+      - NEXTAUTH_URL=http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tgeasy-network
+    restart: unless-stopped
+
+  # PostgreSQL база данных
+  db:
+    image: postgres:15-alpine
+    container_name: tgeasy-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=tgeasy
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schemas/database.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/02-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tgeasy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tgeasy-network
+    restart: unless-stopped
+
+  # Redis для кэширования
+  redis:
+    image: redis:7-alpine
+    container_name: tgeasy-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - tgeasy-network
+    restart: unless-stopped
+
+  # Adminer для управления БД
+  adminer:
+    image: adminer:4-standalone
+    container_name: tgeasy-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=db
+      - ADMINER_DESIGN=lucas-sandery
+    depends_on:
+      - db
+    networks:
+      - tgeasy-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  tgeasy-network:
+    driver: bridge
