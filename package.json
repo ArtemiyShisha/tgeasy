@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "preview": "vercel --prod=false",
+    "deploy:preview": "vercel",
+    "webhook:update": "node scripts/update-telegram-webhook.js",
+    "webhook:check": "node scripts/update-telegram-webhook.js --check"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
@@ -14,7 +18,7 @@
     "@supabase/supabase-js": "^2.50.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "localtunnel": "^2.0.2",
+    "dotenv": "^16.5.0",
     "lucide-react": "^0.379.0",
     "next": "14.2.3",
     "next-themes": "^0.4.6",
@@ -32,6 +36,7 @@
     "eslint-config-next": "14.2.3",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vercel": "^37.0.0"
   }
 }

@@ -2,7 +2,7 @@
 
 ## Обзор архитектуры
 
-TGeasy построен как современное SaaS-приложение с **AI-First подходом**, использующее serverless архитектуру для масштабируемости и **21st.dev MCP** для автоматической генерации UI компонентов. Проект полностью спроектирован для разработки с AI-инструментами.
+TGeasy построен как современное **serverless SaaS-приложение** с **AI-First подходом**, использующее Vercel Functions для масштабируемости и **21st.dev MCP** для автоматической генерации UI компонентов. Проект полностью спроектирован для **нативной разработки** (без Docker) и разработки с AI-инструментами.
 
 ## Архитектурные принципы
 
@@ -69,7 +69,7 @@ TGeasy построен как современное SaaS-приложение 
 ├─────────────────────────────────────────┤
 │       Infrastructure Layer              │
 │    External Services + Database         │
-│   ├── Supabase (PostgreSQL + Auth)     │
+│   ├── Supabase (через MCP интеграцию)  │
 │   ├── Telegram Bot API                 │
 │   ├── ОРД Яндекса API                  │
 │   ├── ЮКасса API                       │
@@ -83,6 +83,48 @@ TGeasy построен как современное SaaS-приложение 
 - **Liskov Substitution** - взаимозаменяемые реализации сервисов
 - **Interface Segregation** - специфичные интерфейсы для каждого домена
 - **Dependency Inversion** - зависимость от абстракций, не реализаций
+
+## Supabase MCP интеграция
+
+**⚠️ ВАЖНО**: В этом проекте **НЕТ локального Supabase**! Все взаимодействие с базой данных происходит через **Supabase MCP интеграцию**.
+
+### Архитектура данных через MCP
+```
+┌─────────────────────────────────────────┐
+│        Frontend (Next.js)              │
+│   ├── lib/supabase/client.ts           │
+│   └── lib/supabase/server.ts           │
+├─────────────────────────────────────────┤
+│        MCP Integration Layer            │
+│   ├── mcp_supabase_* functions         │
+│   ├── Remote Supabase instance         │
+│   └── schemas/database.sql (local)     │
+├─────────────────────────────────────────┤
+│        Supabase Cloud                   │
+│   ├── PostgreSQL Database              │
+│   ├── Authentication                   │
+│   ├── Storage                          │
+│   └── Edge Functions                   │
+└─────────────────────────────────────────┘
+```
+
+### Что ЕСТЬ в проекте:
+- ✅ `schemas/database.sql` - полная схема БД
+- ✅ `lib/supabase/` - клиенты для подключения
+- ✅ `types/database.ts` - TypeScript типы
+- ✅ MCP функции для работы с БД
+
+### Что НЕТ в проекте:
+- ❌ `supabase/` папка с конфигурацией
+- ❌ `supabase/migrations/` - миграции
+- ❌ Локальная установка Supabase CLI
+- ❌ Docker контейнер с PostgreSQL
+
+### Рабочий процесс с БД:
+1. **Просмотр схемы**: читать `schemas/database.sql`
+2. **Создание таблиц**: `mcp_supabase_apply_migration`
+3. **Выполнение SQL**: `mcp_supabase_execute_sql`
+4. **Генерация типов**: `mcp_supabase_generate_typescript_types`
 
 ## AI-First технологическая архитектура
 
