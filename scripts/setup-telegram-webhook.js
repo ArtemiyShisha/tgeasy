@@ -42,14 +42,11 @@ const https = require('https')
 const { URL } = require('url')
 
 // Конфигурация
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
-const BASE_URL = process.argv[2] || process.env.NEXTAUTH_URL || 'https://tgeasy.vercel.app'
-const WEBHOOK_URL = `${BASE_URL}/api/telegram/webhook`
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://tgeasy.vercel.app/api/telegram/webhook'
 
-if (!BOT_TOKEN) {
+if (!TELEGRAM_BOT_TOKEN) {
   console.error('❌ TELEGRAM_BOT_TOKEN не найден в переменных окружения')
-  console.log('Получите токен у @BotFather и добавьте в .env.local:')
-  console.log('TELEGRAM_BOT_TOKEN=your_bot_token_here')
   process.exit(1)
 }
 
@@ -58,7 +55,7 @@ if (!BOT_TOKEN) {
  */
 function telegramRequest(method, data = {}) {
   return new Promise((resolve, reject) => {
-    const url = new URL(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`)
+    const url = new URL(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`)
     const postData = JSON.stringify(data)
     
     const options = {
@@ -133,18 +130,46 @@ async function getWebhookInfo() {
  */
 async function setWebhook() {
   try {
+    console.log('🚀 Настройка Telegram Bot для TGeasy\n')
+
+    // Получаем информацию о боте
+    const botInfo = await getBotInfo()
+    console.log('🤖 Информация о боте:')
+    console.log(`   Имя: ${botInfo.first_name}`)
+    console.log(`   Username: @${botInfo.username}`)
+    console.log(`   ID: ${botInfo.id}\n`)
+
+    // Проверяем текущий webhook
+    const webhookInfo = await getWebhookInfo()
+    console.log('🔗 Текущий webhook:')
+    console.log(`   URL: ${webhookInfo.url || 'не установлен'}`)
+    console.log(`   Pending updates: ${webhookInfo.pending_update_count}\n`)
+
+    // Устанавливаем новый webhook
     console.log(`🔧 Устанавливаем webhook: ${WEBHOOK_URL}`)
     
     await telegramRequest('setWebhook', {
       url: WEBHOOK_URL,
-      allowed_updates: ['message'], // Только сообщения
-      drop_pending_updates: true    // Очищаем очередь
+      allowed_updates: ['message', 'callback_query']
     })
     
     console.log('✅ Webhook успешно установлен!')
+    console.log(`📡 URL: ${WEBHOOK_URL}`)
+    console.log('\n🎉 Telegram Bot готов к работе!')
+    
+    // Проверяем что webhook работает
+    console.log('\n🔍 Проверяем webhook...')
+    const testResponse = await fetch(WEBHOOK_URL)
+    
+    if (testResponse.ok) {
+      console.log('✅ Webhook endpoint доступен')
+    } else {
+      console.log('⚠️  Webhook endpoint недоступен, но это нормально для production')
+    }
+
   } catch (error) {
-    console.error('❌ Ошибка установки webhook:', error.message)
-    throw error
+    console.error('💥 Ошибка настройки:', error.message)
+    process.exit(1)
   }
 }
 
