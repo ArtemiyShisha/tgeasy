@@ -5,8 +5,10 @@ import type { NextRequest } from 'next/server'
 const publicRoutes = [
   '/',
   '/login',
+  '/auth/complete',
   '/api/auth/telegram',
   '/api/auth/callback',
+  '/api/auth/check',
   '/api/auth/refresh',
   '/favicon.ico',
   '/_next',
