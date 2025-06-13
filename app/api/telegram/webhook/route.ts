@@ -30,11 +30,10 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
     const result = await response.json()
     
     if (!result.ok) {
-      console.error('Failed to send message:', result)
+      console.error('Telegram API error:', result)
       return false
     }
 
-    console.log('✅ Message sent successfully')
     return true
   } catch (error) {
     console.error('Error sending message:', error)
@@ -60,60 +59,63 @@ async function handleStartCommand(telegramUserId: number, firstName: string, sta
       .upsert({
         telegram_id: telegramUserId,
         telegram_first_name: firstName,
-        last_login_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
+        last_login_at: new Date().toISOString()
       }, {
         onConflict: 'telegram_id'
       })
-      .select('id')
+      .select()
       .single()
 
-    if (error || !user) {
-      console.error('Failed to create/update user:', error)
-      return await sendMessage(telegramUserId, '❌ Ошибка при регистрации. Попробуйте позже.')
+    if (error) {
+      console.error('Error creating/updating user:', error)
+      return false
     }
 
-    // Отправляем успешное сообщение с кнопкой для возврата на сайт
-    const message = `✅ Авторизация успешна!
+    console.log(`✅ User created/updated: ${user.id}`)
 
-Добро пожаловать в TGeasy, ${firstName}!
-
-Нажмите кнопку ниже чтобы завершить вход на сайте.`
-
+    // Отправляем сообщение с кнопкой для завершения авторизации
+    const completeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://tgeasy.vercel.app'}/auth/complete?telegram_id=${telegramUserId}&state=${state}`
+    
     const keyboard = {
       inline_keyboard: [[
         {
           text: '🚀 Завершить вход',
-          url: `https://tgeasy.vercel.app/auth/complete?telegram_id=${telegramUserId}&state=${state}`
+          url: completeUrl
         }
       ]]
     }
 
+    const message = `🎉 <b>Отлично!</b>
+
+Ваш аккаунт успешно создан в TGeasy!
+
+👤 <b>Пользователь:</b> ${firstName}
+🆔 <b>ID:</b> ${telegramUserId}
+
+Нажмите кнопку ниже чтобы завершить авторизацию и перейти в дашборд:`
+
     return await sendMessage(telegramUserId, message, keyboard)
   }
 
-  // Обычное приветствие
-  const message = `👋 Привет, ${firstName}!
+  // Обычная команда /start без параметров
+  const welcomeMessage = `👋 <b>Добро пожаловать в TGeasy!</b>
 
-Это бот TGeasy для управления рекламными размещениями в Telegram каналах.
+🚀 <b>TGeasy</b> - это платформа для автоматизации рекламных размещений в Telegram каналах.
 
-Для авторизации перейдите на сайт и нажмите "Войти через Telegram".`
+<b>Возможности:</b>
+📺 Управление множественными каналами
+📝 Создание рекламных размещений
+📊 Аналитика и отчеты
+💰 Автоматическая маркировка ОРД
 
-  const keyboard = {
-    inline_keyboard: [[
-      {
-        text: '📝 Перейти на сайт',
-        url: 'https://tgeasy.vercel.app/login'
-      }
-    ]]
-  }
+Для начала работы перейдите на сайт и авторизуйтесь через Telegram.`
 
-  return await sendMessage(telegramUserId, message, keyboard)
+  return await sendMessage(telegramUserId, welcomeMessage)
 }
 
 /**
  * POST /api/telegram/webhook
- * Обработка webhook от Telegram
+ * Обработка webhook от Telegram Bot API
  */
 export async function POST(request: NextRequest) {
   try {
@@ -123,25 +125,31 @@ export async function POST(request: NextRequest) {
     // Обработка сообщений
     if (body.message) {
       const message = body.message
-      const from = message.from
+      const chatId = message.chat.id
+      const userId = message.from.id
+      const firstName = message.from.first_name || 'Пользователь'
       const text = message.text
 
-      if (!from || !text) {
-        return NextResponse.json({ ok: true })
-      }
+      console.log(`💬 Message from ${firstName} (${userId}): ${text}`)
 
       // Обработка команды /start
-      if (text.startsWith('/start')) {
+      if (text && text.startsWith('/start')) {
         const parts = text.split(' ')
         const startParam = parts.length > 1 ? parts[1] : undefined
         
-        await handleStartCommand(from.id, from.first_name, startParam)
+        const success = await handleStartCommand(userId, firstName, startParam)
+        
+        if (success) {
+          console.log(`✅ Start command handled successfully for user ${userId}`)
+        } else {
+          console.error(`❌ Failed to handle start command for user ${userId}`)
+        }
       }
     }
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Webhook error:', error)
+    console.error('❌ Webhook error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
