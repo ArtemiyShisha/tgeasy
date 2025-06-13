@@ -112,7 +112,7 @@ async function handleTelegramAuth(request: NextRequest, telegramData: any) {
   // Получаем правильный хост из заголовков (для localtunnel)
   const baseUrl = getBaseUrl(request)
   
-  // Redirect на dashboard с правильным URL
+  // Сразу перенаправляем в дашборд - авторизация завершена
   return NextResponse.redirect(new URL('/dashboard', baseUrl))
 }
 

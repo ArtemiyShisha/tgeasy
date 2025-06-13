@@ -97,6 +97,7 @@ CREATE TABLE users (
   telegram_username VARCHAR(32),
   telegram_first_name VARCHAR(64),
   telegram_last_name VARCHAR(64),
+  telegram_activated BOOLEAN NOT NULL DEFAULT false, -- Активирован ли через /start команду
   
   -- Профиль пользователя
   email VARCHAR(255),

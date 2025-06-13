@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "setup-webhook": "node scripts/setup-telegram-webhook.js",
+    "delete-webhook": "node scripts/setup-telegram-webhook.js --delete",
     "preview": "vercel --prod=false",
     "deploy:preview": "vercel",
     "webhook:update": "node scripts/update-telegram-webhook.js",
