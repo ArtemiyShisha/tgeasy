@@ -3,3 +3,67 @@ description:
 globs:
 alwaysApply: false
 ---
+# Native Development Rules
+
+## ⚠️ IMPORTANT: Serverless Native Development
+
+**This is a SERVERLESS project with NATIVE development!**  
+**Docker is NOT REQUIRED and NOT USED in development.**
+
+## Development Environment:
+- ✅ **Native development**: `npm run dev`
+- ✅ **Serverless architecture**: Vercel Functions
+- ✅ **MacBook friendly**: No Docker dependencies
+- ❌ **Docker NOT needed**: Files exist but optional
+
+## How to develop:
+
+### ✅ DO:
+- Use `npm run dev` for development
+- Develop natively with Next.js dev server
+- Use Vercel serverless functions
+- Work directly with Node.js environment
+
+### ❌ DON'T:
+- Don't try to use Docker
+- Don't look for docker-compose setup
+- Don't install Docker Desktop
+- Don't run `docker-compose up`
+
+## Why no Docker?
+1. **Serverless project** - designed for Vercel
+2. **MacBook limitations** - Docker not available/needed
+3. **Native development** - faster and simpler
+4. **AI-optimized** - easier for agents to work with
+
+## Files status:
+- ✅ `docker-compose.yml` - exists but OPTIONAL
+- ✅ `Dockerfile.dev` - exists but OPTIONAL  
+- ✅ `.dockerignore` - exists but OPTIONAL
+- ❌ Docker setup scripts - NOT NEEDED
+
+## Development flow:
+```bash
+npm install
+npm run dev
+# That's it! No Docker needed.
+```
+
+## Telegram OAuth Testing:
+
+### ✅ DO (Vercel Preview Deployments):
+- Create feature branch for testing
+- Push to branch → automatic preview deployment
+- Update webhook: `npm run webhook:update preview-url.vercel.app`
+- Test OAuth on real HTTPS URL
+
+### ❌ DON'T (Local tunneling):
+- Don't use ngrok/localtunnel
+- Don't try to tunnel localhost
+- Don't setup local HTTPS certificates
+
+---
+
+**Remember**: 
+- This is a serverless project - Docker is completely optional!
+- Use Vercel Preview Deployments for Telegram OAuth testing!

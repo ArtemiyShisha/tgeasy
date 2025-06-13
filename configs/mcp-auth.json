@@ -1,0 +1,53 @@
+{
+  "project": {
+    "name": "TGeasy Auth System",
+    "type": "authentication-ui",
+    "domain": "auth"
+  },
+  "designSystem": {
+    "primaryColor": "#3b82f6",
+    "secondaryColor": "#10b981",
+    "accentColor": "#8b5cf6",
+    "telegramColor": "#0088cc",
+    "errorColor": "#ef4444",
+    "successColor": "#10b981",
+    "warningColor": "#f59e0b"
+  },
+  "components": {
+    "TelegramLoginButton": {
+      "variants": ["default", "loading", "disabled"],
+      "sizes": ["small", "medium", "large"],
+      "animations": ["hover-lift", "loading-spin", "click-scale"]
+    },
+    "AuthCard": {
+      "effects": ["glassmorphism", "backdrop-blur"],
+      "variants": ["default", "loading"],
+      "responsive": true
+    },
+    "LoadingSpinner": {
+      "sizes": ["small", "medium", "large"],
+      "variants": ["inline", "overlay", "fullscreen"]
+    },
+    "AuthLayout": {
+      "background": "gradient-animated",
+      "responsive": true,
+      "theme": "dual-mode"
+    }
+  },
+  "animations": {
+    "duration": "fast",
+    "easing": "ease-out",
+    "reduceMotion": true
+  },
+  "accessibility": {
+    "level": "WCAG-AA",
+    "keyboardNavigation": true,
+    "screenReader": true,
+    "highContrast": true
+  },
+  "performance": {
+    "codeSplitting": true,
+    "lazyLoading": true,
+    "bundleOptimization": true
+  }
+} 

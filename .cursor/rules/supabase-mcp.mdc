@@ -3,3 +3,56 @@ description:
 globs:
 alwaysApply: false
 ---
+# Supabase MCP Integration Rules
+
+## ⚠️ CRITICAL: No Local Supabase
+
+**THIS PROJECT DOES NOT USE LOCAL SUPABASE!** All database interactions happen through **Supabase MCP integration**.
+
+## What EXISTS in the project:
+- ✅ `schemas/database.sql` - complete database schema
+- ✅ `lib/supabase/client.ts` - browser client  
+- ✅ `lib/supabase/server.ts` - server client
+- ✅ `types/database.ts` - TypeScript types
+- ✅ Tasks 2-3 are **COMPLETED via MCP**
+
+## What does NOT exist:
+- ❌ `supabase/` configuration folder
+- ❌ `supabase/migrations/` directory
+- ❌ Local Supabase CLI installation
+- ❌ Docker PostgreSQL container
+- ❌ Local database setup
+
+## How to work with database:
+
+### ✅ DO:
+- Use MCP functions: `mcp_supabase_*`
+- Read schema from: `schemas/database.sql`
+- Use existing clients in: `lib/supabase/`
+- Generate types via: `mcp_supabase_generate_typescript_types`
+
+### ❌ DON'T:
+- Look for `supabase/migrations/`
+- Try to install Supabase CLI
+- Create local migrations
+- Search for `supabase init` or `supabase start`
+
+## MCP Functions to use:
+```
+mcp_supabase_list_tables
+mcp_supabase_execute_sql  
+mcp_supabase_apply_migration
+mcp_supabase_generate_typescript_types
+mcp_supabase_list_projects
+```
+
+## Task Status Check:
+- **Task 2**: ✅ COMPLETED via MCP (schema in `schemas/database.sql`)
+- **Task 3**: ✅ COMPLETED via MCP (clients in `lib/supabase/`)
+
+## Reference:
+See `docs/supabase-mcp-guide.md` for complete guide.
+
+---
+
+**Remember**: Tasks 2 and 3 are ALREADY DONE via MCP integration!
