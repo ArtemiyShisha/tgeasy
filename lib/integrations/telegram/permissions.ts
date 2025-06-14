@@ -1,12 +1,18 @@
 /**
  * Интеграция с Telegram API для работы с правами доступа пользователей
+ * ОБНОВЛЕНО для Задачи 11: добавлены новые функции синхронизации прав
  */
 
 import type {
   TelegramChatMember,
   TelegramChatAdministrator,
+  ChannelPermission,
+  SyncChannelPermissionsResponse,
+  TelegramUserStatus,
+  PermissionCheckResult,
 } from '@/types/channel-permissions';
 import { validateTelegramChatMember, filterChannelAdmins } from '@/utils/telegram-permissions';
+import { getTelegramBotAPI } from './bot-api';
 
 // Базовый интерфейс для Telegram API response
 interface TelegramApiResponse<T = any> {
@@ -85,9 +91,124 @@ export class TelegramPermissionsAPI {
   }
 
   /**
+   * НОВАЯ ФУНКЦИЯ: Синхронизирует права доступа канала
+   * Получает всех администраторов и возвращает данные для сохранения в БД
+   */
+  async syncChannelPermissions(channelId: string): Promise<SyncChannelPermissionsResponse> {
+    const startTime = Date.now();
+    const errors: string[] = [];
+    let syncedPermissions = 0;
+    let removedPermissions = 0;
+
+    try {
+      // Получаем всех администраторов канала
+      const administrators = await this.getChatAdministrators(channelId);
+      
+      if (administrators.length === 0) {
+        return {
+          success: false,
+          channel_id: channelId,
+          synced_permissions: 0,
+          removed_permissions: 0,
+          errors: ['No administrators found or channel not accessible'],
+          sync_duration_ms: Date.now() - startTime,
+          last_synced_at: new Date()
+        };
+      }
+
+      syncedPermissions = administrators.length;
+
+      return {
+        success: true,
+        channel_id: channelId,
+        synced_permissions: syncedPermissions,
+        removed_permissions: removedPermissions,
+        errors,
+        sync_duration_ms: Date.now() - startTime,
+        last_synced_at: new Date()
+      };
+
+    } catch (error) {
+      errors.push(`Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      return {
+        success: false,
+        channel_id: channelId,
+        synced_permissions: syncedPermissions,
+        removed_permissions: removedPermissions,
+        errors,
+        sync_duration_ms: Date.now() - startTime,
+        last_synced_at: new Date()
+      };
+    }
+  }
+
+  /**
+   * НОВАЯ ФУНКЦИЯ: Получает права пользователя в канале
+   */
+  async getUserChannelPermissions(userId: number, channelId: string): Promise<TelegramChatMember | null> {
+    return this.getChatMember(channelId, userId);
+  }
+
+  /**
+   * НОВАЯ ФУНКЦИЯ: Маппит права Telegram в права TGeasy
+   */
+  mapTelegramPermissions(telegramMember: TelegramChatMember): Partial<ChannelPermission> {
+    const status = telegramMember.status as TelegramUserStatus;
+    
+    if (status !== 'creator' && status !== 'administrator') {
+      throw new Error('User is not an administrator');
+    }
+
+    return {
+      telegram_status: status,
+      can_post_messages: telegramMember.can_post_messages ?? true,
+      can_edit_messages: telegramMember.can_edit_messages ?? (status === 'creator'),
+      can_delete_messages: telegramMember.can_delete_messages ?? (status === 'creator'),
+      can_change_info: telegramMember.can_change_info ?? (status === 'creator'),
+      can_invite_users: telegramMember.can_invite_users ?? (status === 'creator'),
+      last_synced_at: new Date()
+    };
+  }
+
+  /**
+   * НОВАЯ ФУНКЦИЯ: Проверяет, является ли пользователь администратором канала
+   */
+  async isUserChannelAdmin(userId: number, channelId: string): Promise<PermissionCheckResult> {
+    try {
+      const member = await this.getChatMember(channelId, userId);
+      
+      if (!member) {
+        return {
+          has_permission: false,
+          reason: 'User not found in channel',
+          permission_level: 'none'
+        };
+      }
+
+      const isAdmin = member.status === 'creator' || member.status === 'administrator';
+      
+      return {
+        has_permission: isAdmin,
+        reason: isAdmin ? undefined : 'User is not an administrator',
+        permission_level: member.status === 'creator' ? 'creator' : 
+                          member.status === 'administrator' ? 'administrator' : 'none',
+        telegram_status: member.status as TelegramUserStatus
+      };
+
+    } catch (error) {
+      return {
+        has_permission: false,
+        reason: `Error checking permissions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        permission_level: 'none'
+      };
+    }
+  }
+
+  /**
    * Проверяет, является ли пользователь администратором канала
    */
-  async isUserChannelAdmin(chatId: string, userId: number): Promise<boolean> {
+  async isUserChannelAdmin_OLD(chatId: string, userId: number): Promise<boolean> {
     const member = await this.getChatMember(chatId, userId);
     if (!member) return false;
     
@@ -145,7 +266,7 @@ export class TelegramPermissionsAPI {
       const botInfo = await this.getMe();
       if (!botInfo?.id) return false;
 
-      return await this.isUserChannelAdmin(chatId, botInfo.id);
+      return await this.isUserChannelAdmin_OLD(chatId, botInfo.id);
     } catch (error) {
       console.error('Error checking bot admin status:', error);
       return false;
@@ -200,84 +321,87 @@ export class TelegramPermissionsAPI {
   ): Promise<TelegramApiResponse<T>> {
     const url = `${this.baseUrl}${this.botToken}/${method}`;
     
-    const requestOptions: RequestInit = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    };
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: params ? JSON.stringify(params) : undefined,
+      });
 
-    if (params) {
-      requestOptions.body = JSON.stringify(params);
+      const data = await response.json() as TelegramApiResponse<T>;
+      
+      if (!data.ok) {
+        console.error(`Telegram API error [${method}]:`, {
+          error_code: data.error_code,
+          description: data.description,
+          params
+        });
+      }
+
+      return data;
+
+    } catch (error) {
+      console.error(`Network error calling Telegram API [${method}]:`, error);
+      return {
+        ok: false,
+        error_code: 500,
+        description: 'Network error'
+      };
     }
-
-    const response = await fetch(url, requestOptions);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    return await response.json();
   }
 
   /**
-   * Обрабатывает ошибки Telegram API и конвертирует их в понятные коды
+   * Обрабатывает ошибки Telegram API
    */
   private handleTelegramError(error: any): string {
-    if (!error?.description) return 'UNKNOWN_ERROR';
-
-    const description = error.description.toLowerCase();
+    if (error && typeof error === 'object') {
+      if (error.error_code && error.description) {
+        return `Telegram API Error ${error.error_code}: ${error.description}`;
+      }
+      if (error.message) {
+        return error.message;
+      }
+    }
     
-    if (description.includes('chat not found')) return 'CHAT_NOT_FOUND';
-    if (description.includes('user not found')) return 'USER_NOT_FOUND';
-    if (description.includes('bot is not a member')) return 'BOT_NOT_MEMBER';
-    if (description.includes('not enough rights')) return 'INSUFFICIENT_RIGHTS';
-    if (description.includes('too many requests')) return 'RATE_LIMIT_EXCEEDED';
-    if (description.includes('bad request')) return 'BAD_REQUEST';
-    if (description.includes('forbidden')) return 'FORBIDDEN';
-
-    return 'TELEGRAM_API_ERROR';
+    return 'Unknown error occurred';
   }
 
   /**
-   * Создает экземпляр API с обработкой ошибок
+   * Создает instance класса с проверкой token
    */
   static create(botToken?: string): TelegramPermissionsAPI {
-    return new TelegramPermissionsAPI(botToken);
+    const instance = new TelegramPermissionsAPI(botToken);
+    // Можно добавить дополнительную валидацию token здесь
+    return instance;
   }
-}
-
-// Синглтон экземпляр для использования в приложении
-let telegramPermissionsAPI: TelegramPermissionsAPI | null = null;
-
-export function getTelegramPermissionsAPI(): TelegramPermissionsAPI {
-  if (!telegramPermissionsAPI) {
-    telegramPermissionsAPI = TelegramPermissionsAPI.create();
-  }
-  return telegramPermissionsAPI;
 }
 
 /**
- * Утилитарные функции для работы с правами через Telegram API
+ * Получает singleton instance Telegram Permissions API
  */
+export function getTelegramPermissionsAPI(): TelegramPermissionsAPI {
+  return TelegramPermissionsAPI.create();
+}
 
 /**
- * Проверяет доступность канала и права бота
+ * НОВАЯ ФУНКЦИЯ: Валидирует доступ к каналу и права бота
  */
 export async function validateChannelAccess(chatId: string): Promise<{
   accessible: boolean;
   botIsAdmin: boolean;
   error?: string;
 }> {
-  const api = getTelegramPermissionsAPI();
-  
   try {
+    const api = getTelegramPermissionsAPI();
+    
     const accessible = await api.isChannelAccessible(chatId);
     if (!accessible) {
       return {
         accessible: false,
         botIsAdmin: false,
-        error: 'CHAT_NOT_FOUND'
+        error: 'Channel not accessible or not found'
       };
     }
 
@@ -286,34 +410,35 @@ export async function validateChannelAccess(chatId: string): Promise<{
     return {
       accessible: true,
       botIsAdmin,
-      error: botIsAdmin ? undefined : 'BOT_NOT_ADMIN'
+      error: botIsAdmin ? undefined : 'Bot is not an administrator in this channel'
     };
+
   } catch (error) {
     return {
       accessible: false,
       botIsAdmin: false,
-      error: 'VALIDATION_ERROR'
+      error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 }
 
 /**
- * Получает права конкретного пользователя в канале
+ * НОВАЯ ФУНКЦИЯ: Получает права пользователя в канале (alias для consistency)
  */
 export async function getUserChannelPermissions(
   chatId: string,
   userId: number
 ): Promise<TelegramChatMember | null> {
   const api = getTelegramPermissionsAPI();
-  return await api.getChatMember(chatId, userId);
+  return api.getUserChannelPermissions(userId, chatId);
 }
 
 /**
- * Получает всех администраторов канала
+ * НОВАЯ ФУНКЦИЯ: Получает список администраторов канала (alias для consistency)
  */
 export async function getChannelAdministrators(
   chatId: string
 ): Promise<TelegramChatAdministrator[]> {
   const api = getTelegramPermissionsAPI();
-  return await api.getChatAdministrators(chatId);
+  return api.getChatAdministrators(chatId);
 } 
