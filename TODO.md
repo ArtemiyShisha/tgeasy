@@ -474,48 +474,56 @@ OAUTH FLOW:
 
 ---
 
-### Задача 8: Middleware для защищенных маршрутов ✅ ЗАВЕРШЕНО
+### Задача 8: Middleware для защищенных маршрутов ✅ ЗАВЕРШЕНО + ОБНОВЛЕНО
 
 **Модуль**: Auth  
 **Приоритет**: Критический  
 **Зависимости**: Задача 7  
 **Время**: 45 минут  
 
-**Файлы для создания**:
-- `middleware.ts`
-- `lib/auth/middleware.ts`
-- `lib/auth/permissions.ts`
-- `utils/auth-helpers.ts`
+**⚠️ АРХИТЕКТУРНОЕ ИЗМЕНЕНИЕ**: Упрощена система ролей в пользу **Telegram-native прав доступа**.
+
+**Файлы созданы/обновлены**:
+- ✅ `middleware.ts` (уже был упрощен)
+- ✅ `lib/auth/middleware.ts` (обновлен под новую архитектуру)
+- ✅ `lib/auth/permissions.ts` (полностью переписан под Telegram-native подход)
+- ✅ `utils/auth-helpers.ts` (создан заново с упрощенными утилитами)
 
 **Описание**:
-Создание middleware для проверки аутентификации и авторизации пользователей на защищенных маршрутах.
+Создание middleware для проверки аутентификации пользователей на защищенных маршрутах. **Полностью переработана система прав** под Telegram-native подход.
 
 **Технические требования**:
-- Next.js middleware
-- JWT token validation
-- Route protection
-- Role-based access control
-- Redirect logic
+- Next.js middleware (только базовая аутентификация)
+- Cookie-based session validation
+- Route protection (authenticated/unauthenticated)
+- **Telegram-native permissions** (на уровне API)
+- Упрощенные утилиты аутентификации
 
 **Критерии готовности**:
-- [ ] Неавторизованные перенаправляются на /login
-- [ ] Авторизованные получают доступ
-- [ ] JWT токены валидируются
-- [ ] Роли проверяются корректно
-- [ ] Performance не страдает
+- [x] Неавторизованные перенаправляются на /login
+- [x] Авторизованные получают доступ к dashboard
+- [x] Cookie session валидируется через БД
+- [x] **Система ролей упрощена** (user/admin)
+- [x] **Telegram permissions** готовы для API интеграции
+- [x] Performance оптимизирован
+
+**Обновления под новую архитектуру**:
+- **Middleware**: только базовая аутентификация (cookies проверка)
+- **Permissions**: Telegram-native типы и mapping функции
+- **Auth helpers**: упрощенные утилиты для UI
+- **Channel права**: проверяются через Telegram API в endpoints
 
 **Промт**:
-Создай middleware для защиты маршрутов и проверки авторизации в TGeasy.
+Создай middleware для защиты маршрутов с упрощенной системой авторизации.
 
 ФАЙЛЫ:
 - middleware.ts (главный Next.js middleware)
 - lib/auth/middleware.ts (логика аутентификации)
-- lib/auth/permissions.ts (система разрешений)
+- lib/auth/permissions.ts (упрощенная система разрешений)
 - utils/auth-helpers.ts
 
 ЗАЩИЩЕННЫЕ МАРШРУТЫ:
 - /dashboard/* → требует аутентификации
-- /admin/* → требует роль admin
 - /api/protected/* → требует токен
 
 ПУБЛИЧНЫЕ МАРШРУТЫ:
@@ -523,18 +531,18 @@ OAUTH FLOW:
 - /login, /api/auth/*
 - /public-stats/* (публичная аналитика)
 
-ЛОГИКА:
+УПРОЩЕННАЯ ЛОГИКА:
 - Проверка JWT токена из cookies
 - Валидация сессии в Supabase
-- Проверка ролей пользователя
+- **НЕТ сложной проверки ролей** в middleware
 - Redirect неавторизованных на /login
 
-РОЛИ:
-- user: базовые функции
-- admin: полный доступ + управление пользователями
-- Channel-level permissions для совместной работы
+ПРАВА НА УРОВНЕ API:
+- **Channel permissions**: проверяются в API endpoints
+- **Telegram-native права**: синхронизируются с Telegram API
+- **Упрощенная модель**: authenticated user + channel-specific права
 
-РЕЗУЛЬТАТ: Middleware защищает маршруты без влияния на производительность
+РЕЗУЛЬТАТ: Упрощенный middleware с Telegram-native правами на уровне API
 
 ---
 
@@ -543,36 +551,95 @@ OAUTH FLOW:
 **Модуль**: Auth  
 **Приоритет**: Критический  
 **Зависимости**: Задача 6, 8  
-**Время**: 60 минут  
+**Время**: 60 минут → **ФАКТИЧЕСКИ: ~4 часа** (включая отладку и исправления)
 
 **Файлы созданы**:
 - ✅ `docs/ui-requirements/auth.md` - UI requirements
 - ✅ `app/(auth)/login/page.tsx` - современная страница login через MCP
 - ✅ `package.json` - добавлен framer-motion
 - ✅ `app/globals.css` - стили для Telegram widget интеграции
+- ✅ `components/auth/telegram-login-widget.tsx` - **ПЕРЕРАБОТАН** на direct bot flow
+- ✅ `app/auth/complete/page.tsx` - страница завершения авторизации
+- ✅ `app/api/auth/check/route.ts` - API для проверки авторизации
+- ✅ `middleware.ts` - **ИСПРАВЛЕН** добавлен `/auth/complete` в public routes
 
 **Описание**:
 Генерация UI для процесса авторизации через Telegram с использованием 21st.dev MCP. Современный дизайн и UX.
 
+**⚠️ ВАЖНЫЕ ИЗМЕНЕНИЯ В ПРОЦЕССЕ РАЗРАБОТКИ:**
+
+**Проблема 1: Telegram Login Widget не работал**
+- **Причина**: Новые пользователи не получали SMS коды для авторизации
+- **Решение**: Заменили Telegram Login Widget на **direct bot authorization flow**
+
+**Проблема 2: Mobile WebView изоляция**
+- **Причина**: Авторизация в Telegram WebView не передавалась в основной браузер
+- **Решение**: Добавили поддержку Telegram WebView API и специальную обработку
+
+**Проблема 3: Middleware блокировал `/auth/complete`**
+- **Причина**: Страница завершения авторизации была заблокирована middleware
+- **Решение**: Добавили `/auth/complete` в список публичных маршрутов
+
+**Проблема 4: Данные пользователя не сохранялись полностью**
+- **Причина**: В webhook не сохранялись `username` и `last_name`
+- **Решение**: Исправили обработку данных пользователя в webhook и callback
+
+**ФИНАЛЬНАЯ АРХИТЕКТУРА АВТОРИЗАЦИИ:**
+
+1. **Direct Bot Flow** (вместо Telegram Login Widget):
+   ```
+   Пользователь → Кнопка "Войти" → Открытие t.me/bot?start=auth_STATE → 
+   Telegram Bot → Webhook → Создание пользователя → 
+   Кнопка "Завершить вход" → /auth/complete → Dashboard
+   ```
+
+2. **Компоненты**:
+   - `TelegramLoginWidget` - генерирует ссылку на бота с уникальным state
+   - `/api/telegram/webhook` - обрабатывает команды бота, создает пользователей
+   - `/auth/complete` - завершает авторизацию, устанавливает сессию
+   - `/api/auth/check` - проверяет статус авторизации
+
+3. **Безопасность**:
+   - Уникальный `state` параметр для каждой авторизации
+   - Проверка подписи Telegram webhook
+   - Secure cookies для сессий
+   - CSRF защита
+
 **Технические требования**:
-- UI requirements документация для MCP
-- Telegram Login Widget интеграция
-- Loading states и error handling
-- Responsive дизайн
-- Accessibility соблюдение
+- ✅ UI requirements документация для MCP
+- ✅ Telegram Bot integration вместо Login Widget
+- ✅ Loading states и error handling
+- ✅ Responsive дизайн
+- ✅ Accessibility соблюдение
+- ✅ Mobile WebView поддержка
 
 **Критерии готовности**:
 - [x] UI requirements документированы
 - [x] Страницы сгенерированы через MCP
-- [x] Telegram кнопка интегрирована
+- [x] Telegram авторизация работает (через бота)
 - [x] Loading и error states отображаются
 - [x] Responsive на всех устройствах
 - [x] Glassmorphism эффекты добавлены
 - [x] Анимации с framer-motion
 - [x] Темная/светлая тема
+- [x] **PRODUCTION READY** - протестировано на Vercel
+
+**Результаты деплоя**:
+- ✅ **Production URL**: https://tgeasy-659ynk6tg-shishkinartemiy-gmailcoms-projects.vercel.app
+- ✅ **Telegram Bot**: @tgeasy_oauth_bot настроен и работает
+- ✅ **Webhook**: настроен на production URL
+- ✅ **Авторизация**: полный flow работает на desktop и mobile
+- ✅ **База данных**: пользователи сохраняются с полными данными
+
+**Lessons Learned**:
+1. **Telegram Login Widget** может не работать для новых пользователей - лучше использовать direct bot flow
+2. **Mobile WebView** требует специальной обработки для передачи авторизации
+3. **Middleware** нужно настраивать аккуратно чтобы не блокировать auth endpoints
+4. **Webhook данные** нужно логировать для отладки проблем с сохранением пользователей
+5. **MCP генерация** работает отлично для UI, но бизнес-логику нужно дорабатывать вручную
 
 **Промт**:
-Создай UI для процесса авторизации используя 21st.dev MCP.
+Создай comprehensive UI для процесса авторизации используя 21st.dev MCP.
 
 ЦЕЛЬ: Современный, профессиональный UI который произведет WOW эффект.
 
@@ -600,77 +667,124 @@ CALLBACK: Loading spinner, success/error states, автоматический re
 
 ---
 
-### Задача 10: Управление пользователями и роли
+### Задача 10: Telegram-native система прав доступа
 
 **Модуль**: Users  
 **Приоритет**: Критический  
 **Зависимости**: Задача 9  
-**Время**: 75 минут  
+**Время**: 60 минут  
 
 **Файлы для создания**:
-- `lib/services/user-service.ts`
-- `lib/repositories/user-repository.ts`
-- `app/api/users/route.ts`
-- `app/api/users/[id]/route.ts`
-- `lib/auth/roles.ts`
-- `lib/auth/permissions.ts`
-- `lib/services/permission-service.ts`
-- `types/user.ts`
-- `types/permissions.ts`
+- `lib/services/channel-permissions-service.ts`
+- `lib/repositories/channel-permissions-repository.ts`
+- `app/api/channels/[id]/permissions/route.ts`
+- `lib/integrations/telegram/permissions.ts`
+- `types/channel-permissions.ts`
+- `utils/telegram-permissions.ts`
 
 **Описание**:
-Комплексная система управления пользователями с RBAC (роли и разрешения).
+Система управления правами доступа на основе Telegram-native ролей. Пользователи получают те же права в TGeasy, что и в Telegram каналах.
+
+**⚠️ АРХИТЕКТУРНОЕ ИЗМЕНЕНИЕ**: Отказ от сложной системы ролей TGeasy в пользу синхронизации с Telegram API.
+
+**Новый подход**:
+1. **Показываем только доступные каналы**: пользователь видит только каналы, где он `creator` или `administrator`
+2. **Наследование прав**: права в TGeasy = права в Telegram канале
+3. **Автоматическая синхронизация**: периодическое обновление прав через Telegram API
 
 **Технические требования**:
-- Repository pattern для users
-- Service layer для бизнес-логики
-- Role-based access control
-- Channel-level permissions
-- API endpoints для управления
+- Telegram API integration для проверки прав
+- Синхронизация прав при подключении канала
+- Периодическое обновление прав (daily cron)
+- Channel-level permissions вместо user roles
+- Упрощенная модель данных
 
 **Критерии готовности**:
-- [ ] User CRUD операции работают
-- [ ] Система ролей функционирует
-- [ ] Channel permissions работают
-- [ ] API защищены правами доступа
-- [ ] Валидация данных корректная
+- [ ] Telegram API проверяет права пользователей
+- [ ] Права синхронизируются при подключении канала
+- [ ] Периодическое обновление прав работает
+- [ ] Пользователи видят только доступные каналы
+- [ ] Права наследуются из Telegram
+
+**Telegram права и их mapping в TGeasy**:
+```typescript
+interface TelegramChannelPermissions {
+  telegram_status: 'creator' | 'administrator';
+  can_post_messages: boolean;      // → может создавать размещения
+  can_edit_messages: boolean;      // → может редактировать размещения  
+  can_delete_messages: boolean;    // → может удалять размещения
+  can_change_info: boolean;        // → может изменять настройки канала в TGeasy
+  can_invite_users: boolean;       // → может приглашать пользователей в TGeasy
+}
+```
+
+**Упрощенная модель прав**:
+- **Creator** → полные права в TGeasy (управление каналом + контент)
+- **Administrator** → права согласно Telegram permissions (в основном контент)
+- **Обычные пользователи** → не видят канал вообще
 
 **Промт**:
-Создай систему управления пользователями с ролями и разрешениями для TGeasy.
+Создай систему управления правами доступа на основе Telegram-native ролей для TGeasy.
+
+ЦЕЛЬ: Упростить систему ролей, используя права пользователей из Telegram каналов.
 
 ФАЙЛЫ:
-- lib/services/user-service.ts (бизнес-логика)
-- lib/repositories/user-repository.ts (работа с БД)
-- app/api/users/route.ts + app/api/users/[id]/route.ts
-- lib/auth/roles.ts + lib/auth/permissions.ts
-- lib/services/permission-service.ts
-- types/user.ts + types/permissions.ts
+- lib/services/channel-permissions-service.ts (синхронизация прав)
+- lib/repositories/channel-permissions-repository.ts (работа с БД)
+- app/api/channels/[id]/permissions/route.ts (API для прав)
+- lib/integrations/telegram/permissions.ts (Telegram API для прав)
+- types/channel-permissions.ts (типы прав)
+- utils/telegram-permissions.ts (утилиты работы с правами)
 
-РОЛИ СИСТЕМЫ:
-- USER: обычный пользователь
-- ADMIN: администратор системы
+АРХИТЕКТУРА ПРАВ:
 
-РАЗРЕШЕНИЯ:
-- MANAGE_CHANNELS, CREATE_POSTS, VIEW_ANALYTICS
-- MANAGE_CONTRACTS, MANAGE_USERS (только ADMIN)
-- ACCESS_ADMIN_PANEL
+Telegram API Integration:
+- getChatMember(chatId, userId) → получение статуса пользователя
+- getChatAdministrators(chatId) → список всех администраторов
+- Проверка прав при подключении канала
+- Периодическая синхронизация (daily cron job)
 
-CHANNEL-LEVEL PERMISSIONS:
-- OWNER: владелец канала (все права)
-- EDITOR: создание/редактирование постов
-- VIEWER: только просмотр аналитики
+Channel Permissions Model:
+```typescript
+interface ChannelPermission {
+  user_id: string;
+  channel_id: string;
+  telegram_status: 'creator' | 'administrator';
+  can_post_messages: boolean;
+  can_edit_messages: boolean;
+  can_delete_messages: boolean;
+  can_change_info: boolean;
+  can_invite_users: boolean;
+  last_synced_at: timestamp;
+}
+```
 
-API ENDPOINTS:
-- GET/POST /api/users (список, создание)
-- GET/PUT/DELETE /api/users/[id]
-- GET/PUT /api/users/[id]/permissions
+ФУНКЦИОНАЛЬНОСТЬ:
+
+syncChannelPermissions(channelId):
+- Получение списка администраторов из Telegram
+- Обновление прав в БД
+- Удаление прав для пользователей, потерявших доступ
+
+getUserChannels(userId):
+- Возврат только каналов, где пользователь имеет права
+- Фильтрация по telegram_status: creator | administrator
+
+checkUserPermission(userId, channelId, permission):
+- Проверка конкретного права пользователя
+- Кеширование результатов для производительности
+
+CRON JOBS:
+- Ежедневная синхронизация прав всех каналов
+- Обновление при изменениях в Telegram (webhook)
+- Cleanup неактивных каналов
 
 БЕЗОПАСНОСТЬ:
-- Валидация всех входных данных
-- Проверка прав доступа на каждом endpoint
-- Rate limiting + audit log
+- Проверка прав на каждом API endpoint
+- Валидация Telegram API responses
+- Rate limiting для Telegram API calls
 
-РЕЗУЛЬТАТ: Гибкая система ролей, легко расширяемая новыми разрешениями
+РЕЗУЛЬТАТ: Простая, надежная система прав, синхронизированная с Telegram
 
 ---
 
@@ -683,18 +797,22 @@ API ENDPOINTS:
 **Зависимости**: Задача 10  
 **Время**: 60 минут  
 
+**⚠️ АРХИТЕКТУРНОЕ ИЗМЕНЕНИЕ**: Фокус на **Telegram-native права доступа** и синхронизацию прав.
+
 **Файлы для создания**:
 - `lib/integrations/telegram/bot-api.ts`
 - `lib/integrations/telegram/types.ts`
 - `lib/integrations/telegram/webhooks.ts`
+- `lib/integrations/telegram/permissions.ts` ⭐ **НОВЫЙ**
 - `utils/telegram-helpers.ts`
 - `types/telegram.ts`
 
 **Описание**:
-Создание сервиса для работы с Telegram Bot API. Получение информации о каналах, проверка прав администратора.
+Создание сервиса для работы с Telegram Bot API с акцентом на **получение и синхронизацию прав пользователей** в каналах.
 
 **Технические требования**:
 - Telegram Bot API client
+- **Права пользователей API** (getChatMember, getChatAdministrators)
 - Error handling и retry logic
 - Rate limiting
 - Webhook support
@@ -703,28 +821,36 @@ API ENDPOINTS:
 **Критерии готовности**:
 - [ ] API клиент подключается к Telegram
 - [ ] Информация о каналах получается
-- [ ] Права администратора проверяются
+- [ ] **Права пользователей синхронизируются** ⭐
+- [ ] **Telegram статусы маппятся в TGeasy права** ⭐
 - [ ] Rate limiting работает
 - [ ] Ошибки обрабатываются
 
 **Промт**:
-Создай сервис для работы с Telegram Bot API для управления каналами в TGeasy.
+Создай сервис для работы с Telegram Bot API с фокусом на Telegram-native права доступа.
 
-ЦЕЛЬ: Проверка прав администратора, получение информации о канале, мониторинг статуса.
+ЦЕЛЬ: **Синхронизация прав пользователей** из Telegram каналов, получение информации о канале, мониторинг статуса.
 
 ФАЙЛЫ:
 - lib/integrations/telegram/bot-api.ts (основной клиент)
 - lib/integrations/telegram/types.ts (типы Telegram API)
 - lib/integrations/telegram/webhooks.ts (обработка вебхуков)
+- lib/integrations/telegram/permissions.ts ⭐ (работа с правами)
 - utils/telegram-helpers.ts
 - types/telegram.ts
 
 ОСНОВНОЙ ФУНКЦИОНАЛ:
 - getChat(chatId) - информация о канале
-- getChatAdministrators(chatId) - список админов
-- getChatMember(chatId, userId) - права пользователя
+- **getChatAdministrators(chatId) - список админов с правами** ⭐
+- **getChatMember(chatId, userId) - детальные права пользователя** ⭐
 - sendMessage(chatId, text) - отправка сообщений
 - getMe() - информация о боте
+
+**НОВЫЙ ФУНКЦИОНАЛ - ПРАВА**:
+- **syncChannelPermissions(channelId)** - синхронизация прав канала
+- **getUserChannelPermissions(userId, channelId)** - права пользователя
+- **mapTelegramPermissions(telegramMember)** - mapping в TGeasy права
+- **isUserChannelAdmin(userId, channelId)** - проверка админских прав
 
 ERROR HANDLING:
 - Rate limiting (30 requests/second)
@@ -736,13 +862,14 @@ WEBHOOK SYSTEM:
 - Регистрация webhook URL
 - Валидация подписи webhook
 - Event routing для разных типов обновлений
+- **Обработка изменений прав пользователей** ⭐
 
 ПЕРЕМЕННЫЕ:
 - TELEGRAM_BOT_TOKEN
 - TELEGRAM_WEBHOOK_SECRET
 - NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
 
-РЕЗУЛЬТАТ: Надежный сервис с качественной обработкой ошибок
+РЕЗУЛЬТАТ: Надежный сервис с **Telegram-native синхронизацией прав**
 
 ---
 
@@ -753,75 +880,92 @@ WEBHOOK SYSTEM:
 **Зависимости**: Задача 11  
 **Время**: 90 минут  
 
+**⚠️ АРХИТЕКТУРНОЕ ИЗМЕНЕНИЕ**: Интеграция с **Telegram-native правами доступа** из Задачи 10.
+
 **Файлы для создания**:
 - `lib/services/channel-service.ts`
 - `lib/repositories/channel-repository.ts`
 - `app/api/channels/route.ts`
 - `app/api/channels/connect/route.ts`
 - `app/api/channels/[id]/route.ts`
-- `app/api/channels/[id]/permissions/route.ts`
+- `app/api/channels/[id]/permissions/route.ts` ⭐ **ОБНОВЛЕН**
 - `lib/services/channel-management.ts`
 - `utils/channel-validation.ts`
 - `types/channel.ts`
 
 **Описание**:
-Полный backend для управления каналами: подключение, CRUD операции, права доступа, мониторинг.
+Полный backend для управления каналами с **автоматической синхронизацией Telegram-native прав**: подключение, CRUD операции, права доступа, мониторинг.
 
 **Технические требования**:
 - Channel connection и validation
 - CRUD операции для каналов
-- Permission management
+- **Telegram-native permission management** ⭐
+- **Автоматическая синхронизация прав** при подключении ⭐
 - Admin rights verification
 - Status monitoring
 
 **Критерии готовности**:
 - [ ] Каналы подключаются успешно
 - [ ] CRUD операции работают
-- [ ] Права администратора проверяются
+- [ ] **Telegram права синхронизируются автоматически** ⭐
+- [ ] **Пользователи видят только доступные каналы** ⭐
 - [ ] Permission management функционирует
 - [ ] Status monitoring активен
 
 **Промт**:
-Создай полный backend для управления Telegram каналами в TGeasy.
+Создай полный backend для управления Telegram каналами с Telegram-native правами доступа.
+
+ЦЕЛЬ: **Автоматическая синхронизация прав** из Telegram при подключении каналов.
 
 ФАЙЛЫ:
-- lib/services/channel-service.ts (бизнес-логика)
+- lib/services/channel-service.ts (бизнес-логика + синхронизация прав)
 - lib/repositories/channel-repository.ts (работа с БД)
-- app/api/channels/route.ts (основные CRUD)
-- app/api/channels/connect/route.ts (подключение новых каналов)
+- app/api/channels/route.ts (основные CRUD + фильтрация по правам)
+- app/api/channels/connect/route.ts (подключение + синхронизация прав)
 - app/api/channels/[id]/route.ts (операции с конкретным каналом)
-- app/api/channels/[id]/permissions/route.ts (управление правами)
+- app/api/channels/[id]/permissions/route.ts ⭐ (Telegram-native права)
 - lib/services/channel-management.ts
 - utils/channel-validation.ts
 - types/channel.ts
 
-ПРОЦЕСС ПОДКЛЮЧЕНИЯ КАНАЛА:
+**ОБНОВЛЕННЫЙ ПРОЦЕСС ПОДКЛЮЧЕНИЯ КАНАЛА**:
 1. Пользователь предоставляет username или invite link
 2. Проверка существования канала в Telegram
 3. Проверка прав администратора у бота
-4. Проверка прав пользователя в канале
-5. Сохранение в БД + настройка прав доступа
+4. **Проверка статуса пользователя в канале (creator/administrator)** ⭐
+5. **Синхронизация детальных прав пользователя из Telegram** ⭐
+6. Сохранение в БД + **автоматическая настройка Telegram-native прав** ⭐
 
 API ENDPOINTS:
-- GET /api/channels (список с пагинацией, фильтрацией, поиском)
-- POST /api/channels/connect (подключение с валидацией)
-- GET/PUT/DELETE /api/channels/[id]
+- GET /api/channels (**только каналы где user = creator/administrator**) ⭐
+- POST /api/channels/connect (подключение + **синхронизация прав**) ⭐
+- GET/PUT/DELETE /api/channels/[id] (**с проверкой Telegram прав**) ⭐
 - POST /api/channels/[id]/verify (проверка статуса)
+- **GET /api/channels/[id]/permissions** ⭐ (текущие Telegram права)
+- **POST /api/channels/[id]/sync-permissions** ⭐ (принудительная синхронизация)
 
 ВАЛИДАЦИЯ И ПРОВЕРКИ:
 - Username format validation
 - Invite link parsing
 - Bot admin rights verification
-- User admin rights verification
+- **User creator/administrator status verification** ⭐
+- **Telegram permissions mapping validation** ⭐
 - Channel accessibility check
+
+**НОВЫЙ ФУНКЦИОНАЛ - ПРАВА**:
+- **syncChannelPermissions(channelId)** - синхронизация прав канала
+- **getUserAccessibleChannels(userId)** - только доступные каналы
+- **validateUserChannelAccess(userId, channelId)** - проверка доступа
+- **mapTelegramPermissionsToTGeasy(permissions)** - mapping прав
 
 МОНИТОРИНГ:
 - Channel status tracking
 - Connection health checks
-- Admin rights monitoring
+- **Admin rights monitoring с автоматической синхронизацией** ⭐
 - Subscriber count updates
+- **Permissions drift detection** ⭐
 
-РЕЗУЛЬТАТ: Robust система подключения и управления каналами
+РЕЗУЛЬТАТ: Robust система с **автоматической Telegram-native синхронизацией прав**
 
 ---
 
@@ -832,76 +976,106 @@ API ENDPOINTS:
 **Зависимости**: Задача 12  
 **Время**: 60 минут  
 
+**⚠️ АРХИТЕКТУРНОЕ ИЗМЕНЕНИЕ**: Hooks адаптированы под **Telegram-native права доступа**.
+
 **Файлы для создания**:
-- `hooks/use-channels.ts`
+- `hooks/use-channels.ts` ⭐ **ОБНОВЛЕН**
 - `hooks/use-channel-status.ts`
-- `lib/api/channels-api.ts`
+- `hooks/use-channel-permissions.ts` ⭐ **НОВЫЙ**
+- `lib/api/channels-api.ts` ⭐ **ОБНОВЛЕН**
 - `types/channel-ui.ts`
 - `utils/channel-helpers.ts`
 
 **Описание**:
-React hooks и API клиент для работы с каналами. Подготовка для UI генерации через MCP.
+React hooks и API клиент для работы с каналами с **автоматической фильтрацией по Telegram правам**. Подготовка для UI генерации через MCP.
 
 **Технические требования**:
 - React hooks с SWR/React Query
 - API client с type safety
+- **Автоматическая фильтрация каналов по правам** ⭐
+- **Permissions hooks для UI** ⭐
 - Error handling и loading states
 - Optimistic updates
 - Real-time synchronization
 
 **Критерии готовности**:
-- [ ] Hooks возвращают типизированные данные
+- [ ] Hooks возвращают **только доступные каналы** ⭐
+- [ ] **Permissions hooks работают** ⭐
 - [ ] Loading и error states обрабатываются
 - [ ] API клиент работает корректно
 - [ ] Optimistic updates функционируют
 - [ ] Ready для интеграции с MCP UI
 
 **Промт**:
-Создай React hooks и API клиент для работы с каналами в TGeasy frontend.
+Создай React hooks и API клиент для работы с каналами с Telegram-native правами доступа.
+
+ЦЕЛЬ: **Автоматическая фильтрация каналов** по Telegram правам пользователя.
 
 ФАЙЛЫ:
-- hooks/use-channels.ts (основной хук)
+- hooks/use-channels.ts (основной хук + фильтрация по правам)
 - hooks/use-channel-status.ts (мониторинг статуса)
-- lib/api/channels-api.ts (API клиент)
-- types/channel-ui.ts (типы для UI)
+- hooks/use-channel-permissions.ts ⭐ (управление правами)
+- lib/api/channels-api.ts (API клиент + permissions endpoints)
+- types/channel-ui.ts (типы для UI + permissions)
 - utils/channel-helpers.ts
 
-ОСНОВНЫЕ HOOKS:
+**ОБНОВЛЕННЫЕ HOOKS**:
 
 useChannels():
-- channels, loading, error, refetch
+- **channels (только creator/administrator)**, loading, error, refetch ⭐
 - connectChannel, updateChannel, disconnectChannel
+- **filterByPermissions(permission)** ⭐ - фильтрация по конкретным правам
 - Real-time synchronization с backend
 - Optimistic updates для UI
 
 useChannelStatus(channelId):
-- status, isOnline, lastCheck, adminRights, memberCount
+- status, isOnline, lastCheck, **telegramPermissions**, memberCount ⭐
 - Real-time мониторинг статуса
 - Refresh functionality
 
 useChannelConnection():
 - connect, isConnecting, error, validateChannel
+- **syncPermissions** ⭐ - синхронизация прав после подключения
 - Connection workflow management
 
+**НОВЫЙ HOOK - ПРАВА**:
+useChannelPermissions(channelId):
+- **permissions, loading, error** ⭐
+- **syncPermissions()** - принудительная синхронизация ⭐
+- **hasPermission(permission)** - проверка конкретного права ⭐
+- **isCreator, isAdministrator** - быстрые проверки статуса ⭐
+- **canPost, canEdit, canDelete** - проверки контентных прав ⭐
+
 ФУНКЦИОНАЛЬНОСТЬ:
+- **Автоматическая фильтрация каналов по правам** ⭐
 - Real-time synchronization
 - Optimistic updates
+- **Permissions caching с invalidation** ⭐
 - Error handling с retry logic
 - Loading states для всех операций
 - Cache management
 
-API CLIENT МЕТОДЫ:
-- getChannels, connectChannel, getChannel
+**ОБНОВЛЕННЫЙ API CLIENT**:
+- getChannels (**только доступные**), connectChannel, getChannel
 - updateChannel, disconnectChannel, verifyChannel
+- **getChannelPermissions, syncChannelPermissions** ⭐
+- **getUserAccessibleChannels** ⭐
 - getChannelAnalytics
 
 ERROR HANDLING:
 - Network errors с retry
 - Validation errors с user feedback
-- Permission errors с clear messaging
+- **Permission denied errors с clear messaging** ⭐
+- **Telegram API errors handling** ⭐
 - Rate limit handling
 
-РЕЗУЛЬТАТ: Hooks готовые для интеграции с MCP-генерированным UI
+**PERMISSIONS HELPERS**:
+- **canUserAccessChannel(userId, channelId)** ⭐
+- **mapTelegramPermissions(permissions)** ⭐
+- **getPermissionLevel(permissions)** ⭐
+- **formatPermissionsForUI(permissions)** ⭐
+
+РЕЗУЛЬТАТ: Hooks с **автоматической Telegram-native фильтрацией** готовые для MCP UI
 
 ---
 
@@ -912,33 +1086,38 @@ ERROR HANDLING:
 **Зависимости**: Задача 6, 13  
 **Время**: 90 минут  
 
+**⚠️ АРХИТЕКТУРНОЕ ИЗМЕНЕНИЕ**: UI адаптирован под **Telegram-native права доступа**.
+
 **Файлы для создания**:
-- `docs/ui-requirements/channels.md`
+- `docs/ui-requirements/channels.md` ⭐ **ОБНОВЛЕН**
 - `app/(dashboard)/channels/page.tsx` (через MCP)
 - `components/channels/` (сгенерированные через MCP)
 - `configs/mcp-channels.json`
 
 **Описание**:
-Генерация полного UI для управления каналами через 21st.dev MCP. Список каналов, подключение, настройки.
+Генерация полного UI для управления каналами через 21st.dev MCP с **отображением только доступных каналов** и **Telegram-native статусами**.
 
 **Технические требования**:
 - Comprehensive UI requirements для MCP
-- Integration с hooks из задачи 13
+- Integration с **обновленными hooks** из задачи 13 ⭐
 - Channel connection interface
+- **Telegram permissions display** ⭐
 - Status monitoring UI
-- Permission management interface
+- **Permission-based UI elements** ⭐
 
 **Критерии готовности**:
-- [ ] UI requirements документированы
+- [ ] UI requirements **обновлены под Telegram права** ⭐
 - [ ] UI сгенерирован через MCP
-- [ ] Интеграция с hooks работает
+- [ ] Интеграция с **permissions hooks** работает ⭐
+- [ ] **Показываются только доступные каналы** ⭐
 - [ ] Channel connection UI функционирует
+- [ ] **Telegram permissions отображаются** ⭐
 - [ ] Status monitoring отображается
 
 **Промт**:
-Создай comprehensive UI для управления каналами используя 21st.dev MCP.
+Создай comprehensive UI для управления каналами с Telegram-native правами доступа используя 21st.dev MCP.
 
-ЦЕЛЬ: Современный, intuitive интерфейс для подключения и управления каналами.
+ЦЕЛЬ: **Показ только доступных каналов** с **Telegram permissions индикаторами**.
 
 ФАЙЛЫ:
 - docs/ui-requirements/channels.md (детальные требования для MCP)
@@ -946,35 +1125,51 @@ ERROR HANDLING:
 - components/channels/ (через MCP)
 - configs/mcp-channels.json
 
-UI REQUIREMENTS (channels.md):
+**ОБНОВЛЕННЫЕ UI REQUIREMENTS (channels.md)**:
 
 ГЛАВНАЯ СТРАНИЦА (/channels):
-- Header: "Мои каналы" + count, кнопка "Подключить канал"
+- Header: "Мои каналы" + count (**только доступные**), кнопка "Подключить канал" ⭐
 - Search bar с real-time поиском
-- Фильтры: Все, Подключены, Отключены, Ошибки
+- **Фильтры: Все, Creator, Administrator, Активные, Неактивные** ⭐
 - Responsive grid (1-4 колонки)
 
-CHANNEL CARD:
+**ОБНОВЛЕННЫЙ CHANNEL CARD**:
 - Avatar/Icon канала + название с @username
+- **Telegram Status Badge (Creator/Administrator)** ⭐
+- **Permissions indicators (can_post, can_edit, can_delete)** ⭐
 - Status badge (подключен/отключен/ошибка)
 - Subscriber count с иконкой
 - Last activity timestamp
-- Actions dropdown menu
+- Actions dropdown menu (**с учетом прав**) ⭐
 
-ПОДКЛЮЧЕНИЕ КАНАЛА:
+**ОБНОВЛЕННОЕ ПОДКЛЮЧЕНИЕ КАНАЛА**:
 - ConnectChannelModal с step-by-step wizard
 - Input для username или invite link
 - Real-time validation feedback
-- Preview подключаемого канала
+- **Проверка прав пользователя в канале** ⭐
+- **Preview с отображением статуса (Creator/Administrator)** ⭐
+- **Предупреждение если недостаточно прав** ⭐
+
+**НОВЫЕ КОМПОНЕНТЫ - ПРАВА**:
+- **TelegramStatusBadge** ⭐ (Creator/Administrator)
+- **PermissionsIndicator** ⭐ (can_post, can_edit, can_delete icons)
+- **PermissionsDeniedMessage** ⭐ (когда нет доступа)
+- **PermissionsSyncButton** ⭐ (принудительная синхронизация)
 
 ИНТЕРАКТИВНОСТЬ:
 - Card hover transitions
 - Loading spinners для async операций
 - Success/error toast notifications
 - Real-time updates статуса каналов
+- **Permissions sync indicators** ⭐
+
+**ОБНОВЛЕННЫЕ ФИЛЬТРЫ**:
+- **По Telegram статусу**: Creator, Administrator
+- **По правам**: Can Post, Can Edit, Can Delete
+- По статусу подключения: Активные, Неактивные, Ошибки
 
 RESPONSIVE:
-- Desktop: Full grid layout
+- Desktop: Full grid layout с permissions indicators
 - Tablet: Simplified table с touch targets
 - Mobile: Card layout с swipe actions
 
@@ -982,12 +1177,15 @@ ACCESSIBILITY:
 - ARIA labels, keyboard navigation
 - High contrast mode support
 - Screen reader friendly
+- **Permissions описания для screen readers** ⭐
 
-КОМПОНЕНТЫ для генерации:
+**ОБНОВЛЕННЫЕ КОМПОНЕНТЫ для генерации**:
 ChannelsPage, ChannelCard, ChannelGrid, ConnectChannelModal, 
-ChannelFilters, ChannelSearch, ChannelActions, ChannelStatusBadge
+ChannelFilters, ChannelSearch, ChannelActions, ChannelStatusBadge,
+**TelegramStatusBadge, PermissionsIndicator, PermissionsDeniedMessage,
+PermissionsSyncButton, ChannelPermissionsTooltip** ⭐
 
-РЕЗУЛЬТАТ: Modern, intuitive интерфейс для management каналов
+РЕЗУЛЬТАТ: **Telegram-native интерфейс** с автоматической фильтрацией по правам
 
 ---
 

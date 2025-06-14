@@ -1,7 +1,14 @@
 -- TGeasy Database Schema
 -- Supabase PostgreSQL Schema для автоматизации рекламных кампаний в Telegram
--- Версия: 1.0.0
+-- Версия: 1.1.0
 -- Дата создания: 2025-01-20
+-- Обновление: 2024-12-19 - Telegram-native права доступа
+
+-- ⚠️ АРХИТЕКТУРНАЯ ОСОБЕННОСТЬ: Telegram-native права доступа
+-- Вместо сложной системы ролей TGeasy используются права из Telegram API:
+-- - Пользователи видят только каналы, где они creator или administrator
+-- - Права в TGeasy наследуются из Telegram канала
+-- - Ежедневная синхронизация через getChatMember и getChatAdministrators API
 
 -- ================================================================
 -- EXTENSIONS
@@ -56,11 +63,10 @@ CREATE TYPE subscription_status AS ENUM (
   'trialing'    -- Испытательный период
 );
 
--- Роли доступа к каналам
-CREATE TYPE channel_role AS ENUM (
-  'owner',  -- Владелец канала (все права)
-  'editor', -- Редактор (создание постов, просмотр аналитики)
-  'viewer'  -- Просмотрщик (только просмотр)
+-- Статусы пользователей в Telegram каналах (из Telegram API)
+CREATE TYPE telegram_user_status AS ENUM (
+  'creator',        -- Создатель канала (владелец)
+  'administrator'   -- Администратор канала
 );
 
 -- Статусы платежей
@@ -177,23 +183,36 @@ COMMENT ON TABLE telegram_channels IS 'Telegram каналы, подключен
 COMMENT ON COLUMN telegram_channels.telegram_channel_id IS 'ID или username канала в Telegram';
 COMMENT ON COLUMN telegram_channels.is_active IS 'Доступен ли канал для постинга';
 
--- Права доступа к каналам
+-- Telegram-native права доступа к каналам (синхронизируются с Telegram API)
 CREATE TABLE channel_permissions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   channel_id UUID NOT NULL REFERENCES telegram_channels(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role channel_role NOT NULL,
+  
+  -- Telegram статус и права (из getChatMember API)
+  telegram_status telegram_user_status NOT NULL,
+  can_post_messages BOOLEAN NOT NULL DEFAULT false,
+  can_edit_messages BOOLEAN NOT NULL DEFAULT false,
+  can_delete_messages BOOLEAN NOT NULL DEFAULT false,
+  can_change_info BOOLEAN NOT NULL DEFAULT false,
+  can_invite_users BOOLEAN NOT NULL DEFAULT false,
+  
+  -- Синхронизация с Telegram
+  last_synced_at TIMESTAMPTZ DEFAULT NOW(),
+  sync_error TEXT, -- Ошибка при последней синхронизации
   
   -- Метаданные
-  granted_at TIMESTAMPTZ DEFAULT NOW(),
-  granted_by UUID REFERENCES users(id), -- Кто выдал права
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   
   -- Constraints
   UNIQUE(channel_id, user_id)
 );
 
-COMMENT ON TABLE channel_permissions IS 'Права доступа пользователей к каналам';
-COMMENT ON COLUMN channel_permissions.granted_by IS 'ID пользователя, который выдал права';
+COMMENT ON TABLE channel_permissions IS 'Telegram-native права доступа пользователей к каналам';
+COMMENT ON COLUMN channel_permissions.telegram_status IS 'Статус пользователя в Telegram канале (creator/administrator)';
+COMMENT ON COLUMN channel_permissions.can_post_messages IS 'Может ли пользователь публиковать сообщения (из Telegram API)';
+COMMENT ON COLUMN channel_permissions.last_synced_at IS 'Время последней синхронизации с Telegram API';
 
 -- Договоры с рекламодателями
 CREATE TABLE contracts (
@@ -858,6 +877,10 @@ CREATE TRIGGER update_user_subscriptions_updated_at
 
 CREATE TRIGGER update_telegram_channels_updated_at 
   BEFORE UPDATE ON telegram_channels 
+  FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_channel_permissions_updated_at 
+  BEFORE UPDATE ON channel_permissions 
   FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 CREATE TRIGGER update_contracts_updated_at 

@@ -45,6 +45,14 @@ async function handleTelegramAuth(request: NextRequest, telegramData: any) {
 
   let userId: string
 
+  console.log('📋 Telegram user data:', {
+    id: telegramData.id,
+    first_name: telegramData.first_name,
+    last_name: telegramData.last_name,
+    username: telegramData.username,
+    photo_url: telegramData.photo_url
+  })
+
   if (existingUser) {
     // Обновляем существующего пользователя
     const { data: updatedUser, error } = await supabase
@@ -66,7 +74,7 @@ async function handleTelegramAuth(request: NextRequest, telegramData: any) {
     }
 
     userId = updatedUser.id
-    console.log('User updated successfully:', userId)
+    console.log('✅ User updated successfully:', userId)
   } else {
     // Создаем нового пользователя
     const { data: newUser, error } = await supabase
@@ -88,7 +96,7 @@ async function handleTelegramAuth(request: NextRequest, telegramData: any) {
     }
 
     userId = newUser.id
-    console.log('User created successfully:', userId)
+    console.log('✅ User created successfully:', userId)
   }
 
   // Устанавливаем сессию через cookies

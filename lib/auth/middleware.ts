@@ -3,11 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import type { UserSession } from '@/types/auth'
 
 /**
- * Результат проверки аутентификации в middleware
+ * Результат проверки аутентификации в middleware (упрощенный)
  */
 export interface AuthMiddlewareResult {
   isAuthenticated: boolean
-  isAdmin: boolean
   user: UserSession | null
 }
 
@@ -52,7 +51,7 @@ async function validateSession(request: NextRequest): Promise<UserSession | null
       created_at: user.created_at,
       updated_at: user.updated_at,
       last_login_at: user.last_login_at,
-      role: 'user', // По умолчанию все пользователи имеют роль 'user'
+      role: 'user', // Все пользователи имеют базовую роль 'user'
       
       // Вычисляемые поля
       display_name: (() => {
@@ -82,40 +81,21 @@ async function validateSession(request: NextRequest): Promise<UserSession | null
 }
 
 /**
- * Проверка прав доступа к каналу (заглушка для будущего использования)
- * TODO: Реализовать после создания схемы БД
- */
-export async function checkChannelPermission(
-  userId: string, 
-  channelId: string, 
-  permission: 'owner' | 'admin' | 'viewer'
-): Promise<boolean> {
-  try {
-    // TODO: Реализовать после создания таблицы channel_permissions
-    console.log(`Checking channel permission for user ${userId}, channel ${channelId}, permission ${permission}`)
-    
-    // Пока что возвращаем true для всех пользователей
-    // В будущем здесь будет запрос к БД
-    return true
-
-  } catch (error) {
-    console.error('Channel permission check failed:', error)
-    return false
-  }
-}
-
-/**
- * Главная функция middleware для проверки аутентификации
+ * Главная функция middleware для проверки аутентификации (упрощенная)
+ * 
+ * ⚠️ АРХИТЕКТУРНОЕ ИЗМЕНЕНИЕ: 
+ * - Убрана проверка ролей (isAdmin)
+ * - Channel permissions проверяются на уровне API, не middleware
+ * - Только базовая аутентификация: authenticated/unauthenticated
  */
 export async function authMiddleware(request: NextRequest): Promise<AuthMiddlewareResult> {
   try {
     // Валидируем сессию через cookies и БД
     const user = await validateSession(request)
 
-    // Возвращаем результат проверки
+    // Возвращаем упрощенный результат проверки
     return {
       isAuthenticated: user !== null,
-      isAdmin: user?.role === 'admin',
       user
     }
 
@@ -125,7 +105,6 @@ export async function authMiddleware(request: NextRequest): Promise<AuthMiddlewa
     // В случае ошибки считаем пользователя неавторизованным
     return {
       isAuthenticated: false,
-      isAdmin: false,
       user: null
     }
   }
@@ -145,7 +124,8 @@ export async function requireAuthInAPI(request: NextRequest): Promise<UserSessio
 }
 
 /**
- * Вспомогательная функция для быстрой проверки админ прав в API routes
+ * Вспомогательная функция для проверки админ прав в API routes
+ * (оставлена для совместимости, но используется редко)
  */
 export async function requireAdminInAPI(request: NextRequest): Promise<UserSession> {
   const user = await requireAuthInAPI(request)
@@ -155,4 +135,15 @@ export async function requireAdminInAPI(request: NextRequest): Promise<UserSessi
   }
   
   return user
-} 
+}
+
+/**
+ * ⚠️ УДАЛЕНО: checkChannelPermission
+ * 
+ * Channel permissions теперь проверяются на уровне API endpoints
+ * через Telegram API, а не в middleware
+ * 
+ * Для проверки прав к каналу используйте:
+ * - lib/integrations/telegram/permissions.ts
+ * - Проверка в конкретных API endpoints
+ */ 

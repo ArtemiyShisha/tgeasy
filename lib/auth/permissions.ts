@@ -1,78 +1,61 @@
 /**
- * Система разрешений TGeasy
- * Определяет роли пользователей и их права доступа
+ * Упрощенная система разрешений TGeasy
+ * Основана на Telegram-native правах доступа
+ * 
+ * ⚠️ АРХИТЕКТУРНОЕ ИЗМЕНЕНИЕ: Отказ от сложной системы ролей TGeasy
+ * в пользу синхронизации с Telegram API
  */
 
 /**
- * Основные роли в системе
+ * Базовые роли пользователей (упрощенные)
  */
 export enum UserRole {
-  USER = 'user',     // Обычный пользователь
-  ADMIN = 'admin'    // Администратор системы
+  USER = 'user',     // Обычный пользователь (все авторизованные)
+  ADMIN = 'admin'    // Администратор системы (только для техподдержки)
 }
 
 /**
- * Разрешения на уровне системы
+ * Telegram статусы пользователей в каналах (из Telegram API)
+ */
+export enum TelegramUserStatus {
+  CREATOR = 'creator',           // Создатель канала (владелец)
+  ADMINISTRATOR = 'administrator' // Администратор канала
+}
+
+/**
+ * Telegram права в каналах (из getChatMember API)
+ */
+export interface TelegramChannelPermissions {
+  telegram_status: TelegramUserStatus
+  can_post_messages: boolean      // → может создавать размещения
+  can_edit_messages: boolean      // → может редактировать размещения  
+  can_delete_messages: boolean    // → может удалять размещения
+  can_change_info: boolean        // → может изменять настройки канала в TGeasy
+  can_invite_users: boolean       // → может приглашать пользователей в TGeasy
+  can_pin_messages: boolean       // → дополнительные права
+}
+
+/**
+ * Системные разрешения (упрощенные)
  */
 export enum SystemPermission {
-  // Управление пользователями
-  MANAGE_USERS = 'manage_users',
-  VIEW_USERS = 'view_users',
+  // Базовые права авторизованного пользователя
+  ACCESS_DASHBOARD = 'access_dashboard',
+  VIEW_OWN_DATA = 'view_own_data',
   
-  // Управление каналами
-  MANAGE_CHANNELS = 'manage_channels',
-  CREATE_CHANNELS = 'create_channels',
-  VIEW_CHANNELS = 'view_channels',
-  
-  // Управление размещениями
-  CREATE_POSTS = 'create_posts',
-  MANAGE_POSTS = 'manage_posts',
-  PUBLISH_POSTS = 'publish_posts',
-  
-  // Управление договорами
-  MANAGE_CONTRACTS = 'manage_contracts',
-  VIEW_CONTRACTS = 'view_contracts',
-  
-  // Аналитика
-  VIEW_ANALYTICS = 'view_analytics',
-  EXPORT_ANALYTICS = 'export_analytics',
-  
-  // Администрирование
+  // Администрирование (только для техподдержки)
   ACCESS_ADMIN_PANEL = 'access_admin_panel',
   MANAGE_SYSTEM_SETTINGS = 'manage_system_settings',
-  
-  // Платежи
-  MANAGE_BILLING = 'manage_billing',
-  VIEW_BILLING = 'view_billing'
+  VIEW_ALL_USERS = 'view_all_users'
 }
 
 /**
- * Разрешения на уровне канала
- */
-export enum ChannelPermission {
-  OWNER = 'owner',      // Владелец канала (все права)
-  ADMIN = 'admin',      // Администратор канала (все кроме удаления)
-  EDITOR = 'editor',    // Редактор (создание/редактирование постов)
-  VIEWER = 'viewer'     // Просмотр (только аналитика)
-}
-
-/**
- * Карта разрешений для ролей пользователей
+ * Карта разрешений для ролей пользователей (упрощенная)
  */
 const ROLE_PERMISSIONS: Record<UserRole, SystemPermission[]> = {
   [UserRole.USER]: [
-    SystemPermission.VIEW_CHANNELS,
-    SystemPermission.CREATE_CHANNELS,
-    SystemPermission.MANAGE_CHANNELS,
-    SystemPermission.CREATE_POSTS,
-    SystemPermission.MANAGE_POSTS,
-    SystemPermission.PUBLISH_POSTS,
-    SystemPermission.VIEW_CONTRACTS,
-    SystemPermission.MANAGE_CONTRACTS,
-    SystemPermission.VIEW_ANALYTICS,
-    SystemPermission.EXPORT_ANALYTICS,
-    SystemPermission.VIEW_BILLING,
-    SystemPermission.MANAGE_BILLING
+    SystemPermission.ACCESS_DASHBOARD,
+    SystemPermission.VIEW_OWN_DATA
   ],
   
   [UserRole.ADMIN]: [
@@ -80,16 +63,6 @@ const ROLE_PERMISSIONS: Record<UserRole, SystemPermission[]> = {
     ...Object.values(SystemPermission)
   ]
 }
-
-/**
- * Иерархия разрешений канала (от меньшего к большему)
- */
-const CHANNEL_PERMISSION_HIERARCHY = [
-  ChannelPermission.VIEWER,
-  ChannelPermission.EDITOR,
-  ChannelPermission.ADMIN,
-  ChannelPermission.OWNER
-]
 
 /**
  * Проверяет имеет ли роль определенное системное разрешение
@@ -100,90 +73,86 @@ export function hasSystemPermission(role: UserRole, permission: SystemPermission
 }
 
 /**
- * Проверяет имеет ли пользователь определенное разрешение канала
+ * Mapping Telegram прав в TGeasy функциональность
  */
-export function hasChannelPermission(
-  userChannelRole: ChannelPermission,
-  requiredPermission: ChannelPermission
-): boolean {
-  const userLevel = CHANNEL_PERMISSION_HIERARCHY.indexOf(userChannelRole)
-  const requiredLevel = CHANNEL_PERMISSION_HIERARCHY.indexOf(requiredPermission)
-  
-  return userLevel >= requiredLevel
-}
-
-/**
- * Получает все системные разрешения для роли
- */
-export function getSystemPermissions(role: UserRole): SystemPermission[] {
-  return ROLE_PERMISSIONS[role] || []
-}
-
-/**
- * Проверяет может ли пользователь выполнить действие с ресурсом
- */
-export function canAccessResource(
-  userRole: UserRole,
-  userId: string,
-  resourceOwnerId: string,
-  requiredPermission: SystemPermission
-): boolean {
-  // Админы имеют доступ ко всему
-  if (userRole === UserRole.ADMIN) {
-    return true
-  }
-  
-  // Проверяем системное разрешение
-  if (!hasSystemPermission(userRole, requiredPermission)) {
-    return false
-  }
-  
-  // Пользователи имеют доступ только к своим ресурсам
-  return userId === resourceOwnerId
-}
-
-/**
- * Определяет какие действия можно выполнять с каналом
- */
-export function getChannelActions(permission: ChannelPermission): string[] {
-  switch (permission) {
-    case ChannelPermission.OWNER:
-      return [
-        'view', 'edit', 'delete', 'manage_permissions', 
-        'create_posts', 'edit_posts', 'delete_posts', 'publish_posts',
-        'view_analytics', 'export_analytics', 'manage_contracts'
-      ]
+export function mapTelegramPermissionsToTGeasy(permissions: TelegramChannelPermissions) {
+  return {
+    // Основные права контента
+    canCreatePosts: permissions.can_post_messages,
+    canEditPosts: permissions.can_edit_messages,
+    canDeletePosts: permissions.can_delete_messages,
     
-    case ChannelPermission.ADMIN:
-      return [
-        'view', 'edit', 'manage_permissions',
-        'create_posts', 'edit_posts', 'delete_posts', 'publish_posts',
-        'view_analytics', 'export_analytics', 'manage_contracts'
-      ]
+    // Права управления каналом
+    canManageChannel: permissions.can_change_info,
+    canInviteUsers: permissions.can_invite_users,
     
-    case ChannelPermission.EDITOR:
-      return [
-        'view', 'create_posts', 'edit_posts', 'publish_posts',
-        'view_analytics'
-      ]
+    // Уровень доступа
+    isCreator: permissions.telegram_status === TelegramUserStatus.CREATOR,
+    isAdministrator: permissions.telegram_status === TelegramUserStatus.ADMINISTRATOR,
     
-    case ChannelPermission.VIEWER:
-      return ['view', 'view_analytics']
-    
-    default:
-      return []
+    // Полные права (creator имеет все)
+    hasFullAccess: permissions.telegram_status === TelegramUserStatus.CREATOR
   }
 }
 
 /**
  * Проверяет может ли пользователь выполнить действие с каналом
+ * на основе Telegram прав
  */
 export function canPerformChannelAction(
-  permission: ChannelPermission,
+  permissions: TelegramChannelPermissions,
   action: string
 ): boolean {
-  const allowedActions = getChannelActions(permission)
-  return allowedActions.includes(action)
+  const mappedPermissions = mapTelegramPermissionsToTGeasy(permissions)
+  
+  switch (action) {
+    case 'create_posts':
+      return mappedPermissions.canCreatePosts
+    case 'edit_posts':
+      return mappedPermissions.canEditPosts
+    case 'delete_posts':
+      return mappedPermissions.canDeletePosts
+    case 'manage_channel':
+      return mappedPermissions.canManageChannel
+    case 'invite_users':
+      return mappedPermissions.canInviteUsers
+    case 'view_analytics':
+      return true // Все администраторы могут смотреть аналитику
+    case 'export_analytics':
+      return mappedPermissions.hasFullAccess // Только creators
+    case 'manage_contracts':
+      return mappedPermissions.hasFullAccess // Только creators
+    default:
+      return false
+  }
+}
+
+/**
+ * Проверяет имеет ли пользователь доступ к каналу
+ * (creator или administrator в Telegram)
+ */
+export function hasChannelAccess(permissions: TelegramChannelPermissions | null): boolean {
+  if (!permissions) return false
+  
+  return permissions.telegram_status === TelegramUserStatus.CREATOR ||
+         permissions.telegram_status === TelegramUserStatus.ADMINISTRATOR
+}
+
+/**
+ * Получает уровень доступа пользователя к каналу
+ */
+export function getChannelAccessLevel(permissions: TelegramChannelPermissions | null): string {
+  if (!permissions) return 'none'
+  
+  if (permissions.telegram_status === TelegramUserStatus.CREATOR) {
+    return 'creator'
+  }
+  
+  if (permissions.telegram_status === TelegramUserStatus.ADMINISTRATOR) {
+    return 'administrator'
+  }
+  
+  return 'none'
 }
 
 /**
@@ -194,73 +163,56 @@ export function isValidUserRole(role: string): role is UserRole {
 }
 
 /**
- * Валидирует разрешение канала
+ * Валидирует Telegram статус
  */
-export function isValidChannelPermission(permission: string): permission is ChannelPermission {
-  return Object.values(ChannelPermission).includes(permission as ChannelPermission)
+export function isValidTelegramStatus(status: string): status is TelegramUserStatus {
+  return Object.values(TelegramUserStatus).includes(status as TelegramUserStatus)
 }
 
 /**
- * Получает роль по умолчанию для нового пользователя
+ * Получает роль пользователя по умолчанию
  */
 export function getDefaultUserRole(): UserRole {
   return UserRole.USER
 }
 
 /**
- * Получает разрешение канала по умолчанию для владельца
- */
-export function getDefaultChannelPermission(): ChannelPermission {
-  return ChannelPermission.OWNER
-}
-
-/**
- * Интерфейс для проверки разрешений пользователя
+ * Упрощенный интерфейс прав пользователя
  */
 export interface UserPermissions {
-  systemPermissions: SystemPermission[]
-  channelPermissions: Map<string, ChannelPermission>
+  systemRole: UserRole
+  userId: string
   
+  // Системные права
   hasSystemPermission(permission: SystemPermission): boolean
-  hasChannelPermission(channelId: string, permission: ChannelPermission): boolean
-  canAccessResource(resourceOwnerId: string, permission: SystemPermission): boolean
-  canPerformChannelAction(channelId: string, action: string): boolean
+  canAccessDashboard(): boolean
+  isAdmin(): boolean
+  
+  // Channel-specific права проверяются отдельно через Telegram API
+  // Не хранятся в этом объекте
 }
 
 /**
- * Создает объект разрешений для пользователя
+ * Создает объект прав пользователя (упрощенный)
  */
 export function createUserPermissions(
   role: UserRole,
-  userId: string,
-  channelPermissions: Map<string, ChannelPermission> = new Map()
+  userId: string
 ): UserPermissions {
-  const systemPermissions = getSystemPermissions(role)
-  
   return {
-    systemPermissions,
-    channelPermissions,
+    systemRole: role,
+    userId,
     
     hasSystemPermission(permission: SystemPermission): boolean {
       return hasSystemPermission(role, permission)
     },
     
-    hasChannelPermission(channelId: string, permission: ChannelPermission): boolean {
-      const userChannelRole = channelPermissions.get(channelId)
-      if (!userChannelRole) return false
-      
-      return hasChannelPermission(userChannelRole, permission)
+    canAccessDashboard(): boolean {
+      return hasSystemPermission(role, SystemPermission.ACCESS_DASHBOARD)
     },
     
-    canAccessResource(resourceOwnerId: string, permission: SystemPermission): boolean {
-      return canAccessResource(role, userId, resourceOwnerId, permission)
-    },
-    
-    canPerformChannelAction(channelId: string, action: string): boolean {
-      const userChannelRole = channelPermissions.get(channelId)
-      if (!userChannelRole) return false
-      
-      return canPerformChannelAction(userChannelRole, action)
+    isAdmin(): boolean {
+      return role === UserRole.ADMIN
     }
   }
 } 

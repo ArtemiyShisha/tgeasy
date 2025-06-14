@@ -44,21 +44,24 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
 /**
  * Обработка команды /start с параметрами авторизации
  */
-async function handleStartCommand(telegramUserId: number, firstName: string, startParam?: string) {
+async function handleStartCommand(telegramUserId: number, firstName: string, lastName?: string, username?: string, startParam?: string) {
   const supabase = createClient()
   
   console.log(`🔍 Start command from user ${telegramUserId}, param: ${startParam}`)
+  console.log(`👤 User data: firstName=${firstName}, lastName=${lastName}, username=${username}`)
   
   // Если это команда авторизации
   if (startParam && startParam.startsWith('auth_')) {
     const state = startParam.replace('auth_', '')
     
-    // Создаем или обновляем пользователя
+    // Создаем или обновляем пользователя с полными данными
     const { data: user, error } = await supabase
       .from('users')
       .upsert({
         telegram_id: telegramUserId,
         telegram_first_name: firstName,
+        telegram_last_name: lastName || null,
+        telegram_username: username || null,
         last_login_at: new Date().toISOString()
       }, {
         onConflict: 'telegram_id'
@@ -89,7 +92,7 @@ async function handleStartCommand(telegramUserId: number, firstName: string, sta
 
 Ваш аккаунт успешно создан в TGeasy!
 
-👤 <b>Пользователь:</b> ${firstName}
+👤 <b>Пользователь:</b> ${firstName}${lastName ? ` ${lastName}` : ''}${username ? ` (@${username})` : ''}
 🆔 <b>ID:</b> ${telegramUserId}
 
 Нажмите кнопку ниже чтобы завершить авторизацию и перейти в дашборд:`
@@ -128,6 +131,8 @@ export async function POST(request: NextRequest) {
       const chatId = message.chat.id
       const userId = message.from.id
       const firstName = message.from.first_name || 'Пользователь'
+      const lastName = message.from.last_name
+      const username = message.from.username
       const text = message.text
 
       console.log(`💬 Message from ${firstName} (${userId}): ${text}`)
@@ -137,7 +142,7 @@ export async function POST(request: NextRequest) {
         const parts = text.split(' ')
         const startParam = parts.length > 1 ? parts[1] : undefined
         
-        const success = await handleStartCommand(userId, firstName, startParam)
+        const success = await handleStartCommand(userId, firstName, lastName, username, startParam)
         
         if (success) {
           console.log(`✅ Start command handled successfully for user ${userId}`)
