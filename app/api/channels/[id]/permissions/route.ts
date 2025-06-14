@@ -1,210 +1,186 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getChannelPermissionsService } from '@/lib/services/channel-permissions-service';
-import { createClient } from '@/lib/supabase/server';
-import { z } from 'zod';
+import { ChannelService } from '@/lib/services/channel-service';
 
-// Схема для синхронизации прав
-const SyncPermissionsSchema = z.object({
-  force: z.boolean().optional().default(false),
-});
-
-/**
- * GET /api/channels/[id]/permissions
- * Получение прав доступа к каналу
- */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const channelId = params.id;
-    const service = getChannelPermissionsService();
-
-    // Получаем права пользователя для этого канала
-    const userPermission = await service.getUserChannelPermissions(user.id, channelId);
-    
-    if (!userPermission) {
-      return NextResponse.json(
-        { error: 'Access denied. You do not have permissions for this channel.' },
-        { status: 403 }
-      );
-    }
-
-    // Получаем все права для канала (только если пользователь creator)
-    if (userPermission.telegram_status === 'creator') {
-      const summary = await service.getChannelPermissionsSummary(channelId);
-      
-      return NextResponse.json({
-        user_permission: userPermission,
-        summary,
-      });
-    } else {
-      // Обычные администраторы видят только свои права
-      return NextResponse.json({
-        user_permission: userPermission,
-      });
-    }
-  } catch (error) {
-    console.error('Error getting channel permissions:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+interface RouteParams {
+  params: {
+    id: string
   }
 }
 
 /**
- * POST /api/channels/[id]/permissions
- * Синхронизация прав доступа с Telegram
+ * GET /api/channels/[id]/permissions - Получение текущих Telegram прав канала
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Временно используем фиксированный user_id пока не настроена аутентификация
+    const user_id = '1'; // TODO: получить из session
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const channelId = params.id;
-    const body = await request.json();
-    const { force } = SyncPermissionsSchema.parse(body);
-
-    const service = getChannelPermissionsService();
-
-    // Проверяем, что пользователь имеет права на этот канал
-    const userPermission = await service.getUserChannelPermissions(user.id, channelId);
+    const permissionsService = getChannelPermissionsService();
     
-    if (!userPermission) {
+    // Получение прав пользователя для канала
+    const permissions = await permissionsService.getUserChannelPermissions(user_id, params.id);
+    
+    if (!permissions) {
       return NextResponse.json(
-        { error: 'Access denied. You do not have permissions for this channel.' },
-        { status: 403 }
+        { error: 'Канал не найден или у вас нет прав доступа' },
+        { status: 404 }
       );
     }
 
-    // Синхронизируем права с Telegram
-    const result = await service.syncChannelPermissions({
-      channel_id: channelId,
-      force_sync: force
-    });
-
-    if (!result.success) {
-      return NextResponse.json(
-        { 
-          error: 'Failed to sync permissions',
-          details: result.errors.join(', '),
-        },
-        { status: 500 }
-      );
-    }
+    // Получение сводки по всем правам канала
+    const summary = await permissionsService.getChannelPermissionsSummary(params.id);
 
     return NextResponse.json({
       success: true,
-      synced_permissions: result.synced_permissions,
-      removed_permissions: result.removed_permissions,
-      message: 'Permissions synchronized successfully',
+      data: {
+        user_permissions: permissions,
+        channel_summary: summary
+      }
     });
-  } catch (error) {
-    console.error('Error syncing channel permissions:', error);
-    
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
-    }
 
+  } catch (error) {
+    console.error('Channel permissions GET error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Внутренняя ошибка сервера',
+        message: error instanceof Error ? error.message : 'Неизвестная ошибка'
+      },
       { status: 500 }
     );
   }
 }
 
 /**
- * DELETE /api/channels/[id]/permissions
- * Удаление прав пользователя (только для creator)
+ * POST /api/channels/[id]/permissions - Принудительная синхронизация прав из Telegram
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Временно используем фиксированный user_id пока не настроена аутентификация
+    const user_id = '1'; // TODO: получить из session
 
-    if (authError || !user) {
+    // Парсинг опций синхронизации
+    const body = await request.json().catch(() => ({}));
+    const { force_sync = false } = body;
+
+    const channelService = ChannelService.getInstance();
+    
+    // Проверка доступа пользователя к каналу
+    const channel = await channelService.getChannelById(params.id, user_id);
+    if (!channel) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { error: 'Канал не найден или у вас нет прав доступа' },
+        { status: 404 }
       );
     }
 
-    const channelId = params.id;
-    const { searchParams } = new URL(request.url);
-    const targetUserId = searchParams.get('user_id');
+    // Синхронизация прав
+    const syncResult = await channelService.syncChannelPermissions(params.id, user_id);
 
-    if (!targetUserId) {
+    return NextResponse.json({
+      success: syncResult.success,
+      data: syncResult,
+      message: syncResult.success 
+        ? 'Права канала успешно синхронизированы'
+        : 'Ошибка синхронизации прав'
+    });
+
+  } catch (error) {
+    console.error('Channel permissions POST error:', error);
+    return NextResponse.json(
+      { 
+        error: 'Внутренняя ошибка сервера',
+        message: error instanceof Error ? error.message : 'Неизвестная ошибка'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT /api/channels/[id]/permissions - Проверка конкретного права пользователя
+ */
+export async function PUT(request: NextRequest, { params }: RouteParams) {
+  try {
+    // Временно используем фиксированный user_id пока не настроена аутентификация
+    const user_id = '1'; // TODO: получить из session
+
+    // Парсинг запроса проверки права
+    const body = await request.json();
+    const { permission } = body;
+
+    if (!permission) {
       return NextResponse.json(
-        { error: 'user_id parameter is required' },
+        { error: 'Необходимо указать проверяемое право' },
         { status: 400 }
       );
     }
 
-    const service = getChannelPermissionsService();
+    const permissionsService = getChannelPermissionsService();
+    const checkResult = await permissionsService.checkUserPermission(
+      user_id,
+      params.id,
+      permission
+    );
 
-    // Проверяем, что текущий пользователь - creator канала
-    const userPermission = await service.getUserChannelPermissions(user.id, channelId);
-    
-    if (!userPermission || userPermission.telegram_status !== 'creator') {
+    return NextResponse.json({
+      success: true,
+      data: {
+        permission,
+        check_result: checkResult
+      }
+    });
+
+  } catch (error) {
+    console.error('Channel permission check error:', error);
+    return NextResponse.json(
+      { 
+        error: 'Внутренняя ошибка сервера',
+        message: error instanceof Error ? error.message : 'Неизвестная ошибка'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/channels/[id]/permissions - Удаление прав пользователя (только для отладки)
+ */
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  try {
+    // Временно используем фиксированный user_id пока не настроена аутентификация
+    const user_id = '1'; // TODO: получить из session
+
+    // Проверка окружения - только в development
+    if (process.env.NODE_ENV === 'production') {
       return NextResponse.json(
-        { error: 'Access denied. Only channel creators can remove permissions.' },
+        { error: 'Операция недоступна в production' },
         { status: 403 }
       );
     }
 
-    // Нельзя удалить права самого себя
-    if (targetUserId === user.id) {
-      return NextResponse.json(
-        { error: 'Cannot remove your own permissions' },
-        { status: 400 }
-      );
-    }
-
-    // Удаляем права пользователя
-    const success = await service.removeUserPermission(targetUserId, channelId);
+    const permissionsService = getChannelPermissionsService();
+    const success = await permissionsService.removeUserPermission(user_id, params.id);
 
     if (!success) {
       return NextResponse.json(
-        { error: 'Failed to remove user permissions' },
-        { status: 500 }
+        { error: 'Не удалось удалить права пользователя' },
+        { status: 404 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'User permissions removed successfully',
+      message: 'Права пользователя удалены'
     });
+
   } catch (error) {
-    console.error('Error removing user permissions:', error);
+    console.error('Channel permissions DELETE error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Внутренняя ошибка сервера',
+        message: error instanceof Error ? error.message : 'Неизвестная ошибка'
+      },
       { status: 500 }
     );
   }
