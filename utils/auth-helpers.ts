@@ -5,6 +5,8 @@
 
 import type { UserSession } from '@/types/auth'
 import { UserRole, SystemPermission, hasSystemPermission } from '@/lib/auth/permissions'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 /**
  * Проверяет является ли пользователь аутентифицированным
@@ -159,4 +161,48 @@ export function extractUserIdFromCookies(cookies: { [key: string]: string }): st
 export function extractTelegramIdFromCookies(cookies: { [key: string]: string }): number | null {
   const telegramId = cookies.telegram_id
   return telegramId ? parseInt(telegramId, 10) : null
+}
+
+// ===== API HELPERS =====
+
+/**
+ * Создает успешный API response
+ */
+export function createApiResponse(data: any, user?: UserSession | null, status = 200) {
+  return NextResponse.json({
+    success: true,
+    data,
+    timestamp: new Date().toISOString(),
+    ...(user && { user: { id: user.id, role: user.role } })
+  }, { status })
+}
+
+/**
+ * Создает API response с ошибкой
+ */
+export function createApiErrorResponse(
+  message: string,
+  code: string,
+  status = 400,
+  details?: any
+) {
+  return NextResponse.json({
+    success: false,
+    error: {
+      message,
+      code,
+      ...(details && { details })
+    },
+    timestamp: new Date().toISOString()
+  }, { status })
+}
+
+/**
+ * Получает пользователя из headers запроса (заглушка)
+ * TODO: Реализовать после настройки middleware headers
+ */
+export function getUserFromHeaders(request: NextRequest): UserSession | null {
+  // Пока что возвращаем null, так как мы используем cookies, а не headers
+  // В будущем можно добавить логику извлечения пользователя из headers
+  return null
 } 
