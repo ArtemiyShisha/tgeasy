@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     // Получение каналов
     const channelService = ChannelService.getInstance()
-    const result = await channelService.getUserAccessibleChannels(
+    const result = await channelService.getUserChannels(
       session.id,
       validation.data
     )

@@ -87,18 +87,26 @@ export function useChannels(options: UseChannelsOptions = {}): UseChannelsReturn
   const fetchChannels = useCallback(async () => {
     try {
       setError(null);
+      console.log('🔍 Fetching channels with filters:', filters);
       const response = await channelsApi.getChannels(filters);
+      console.log('📦 API response:', response);
+      
+      if (!response || !response.channels) {
+        console.error('❌ Invalid API response structure:', response);
+        setError('Invalid response from server');
+        return;
+      }
       
       setChannels(response.channels.map(channel => ({
         ...channel,
-        // Add computed permission flags
-        isCreator: channel.permissions?.telegram_status === 'creator',
-        isAdministrator: channel.permissions?.telegram_status === 'administrator',
-        canPost: channel.permissions?.can_post_messages ?? false,
-        canEdit: channel.permissions?.can_edit_messages ?? false,
-        canDelete: channel.permissions?.can_delete_messages ?? false,
-        canChangeInfo: channel.permissions?.can_change_info ?? false,
-        canInviteUsers: channel.permissions?.can_invite_users ?? false,
+        // Add default permission flags (simplified system)
+        isCreator: true, // В упрощенной системе пользователь видит только свои каналы
+        isAdministrator: true,
+        canPost: true,
+        canEdit: true,
+        canDelete: true,
+        canChangeInfo: true,
+        canInviteUsers: true,
       })));
       
     } catch (err) {
@@ -140,13 +148,13 @@ export function useChannels(options: UseChannelsOptions = {}): UseChannelsReturn
         // Add new channel to list with optimistic update
         const newChannel = {
           ...response.channel,
-          isCreator: response.channel.permissions?.telegram_status === 'creator',
-          isAdministrator: response.channel.permissions?.telegram_status === 'administrator',
-          canPost: response.channel.permissions?.can_post_messages ?? false,
-          canEdit: response.channel.permissions?.can_edit_messages ?? false,
-          canDelete: response.channel.permissions?.can_delete_messages ?? false,
-          canChangeInfo: response.channel.permissions?.can_change_info ?? false,
-          canInviteUsers: response.channel.permissions?.can_invite_users ?? false,
+          isCreator: true, // В упрощенной системе пользователь видит только свои каналы
+          isAdministrator: true,
+          canPost: true,
+          canEdit: true,
+          canDelete: true,
+          canChangeInfo: true,
+          canInviteUsers: true,
         };
         
         setChannels(prev => [newChannel, ...prev]);
@@ -179,13 +187,13 @@ export function useChannels(options: UseChannelsOptions = {}): UseChannelsReturn
       
       const enrichedChannel = {
         ...updatedChannel,
-        isCreator: updatedChannel.permissions?.telegram_status === 'creator',
-        isAdministrator: updatedChannel.permissions?.telegram_status === 'administrator',
-        canPost: updatedChannel.permissions?.can_post_messages ?? false,
-        canEdit: updatedChannel.permissions?.can_edit_messages ?? false,
-        canDelete: updatedChannel.permissions?.can_delete_messages ?? false,
-        canChangeInfo: updatedChannel.permissions?.can_change_info ?? false,
-        canInviteUsers: updatedChannel.permissions?.can_invite_users ?? false,
+        isCreator: true, // В упрощенной системе пользователь видит только свои каналы
+        isAdministrator: true,
+        canPost: true,
+        canEdit: true,
+        canDelete: true,
+        canChangeInfo: true,
+        canInviteUsers: true,
       };
 
       setChannels(prev => prev.map(channel => 

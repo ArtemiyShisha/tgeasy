@@ -2,27 +2,21 @@ import {
   ChannelConnectionRequest, 
   ChannelConnectionResponse,
   ChannelConnectionErrorCode,
-  ChannelWithPermissions,
-  ChannelFilters,
-  ChannelSyncResult,
-  ChannelVerification
+  ChannelFilters
 } from '@/types/channel'
 import { ChannelRepository } from '@/lib/repositories/channel-repository'
 import { TelegramBotAPI } from '@/lib/integrations/telegram/bot-api'
-import { getChannelPermissionsService } from '@/lib/services/channel-permissions-service'
-import { validateChannelIdentifier, normalizeChannelIdentifier, getChannelErrorMessage } from '@/utils/channel-validation'
+import { validateChannelIdentifier, getChannelErrorMessage } from '@/utils/channel-validation'
 import { TelegramError } from '@/types/telegram'
 
 export class ChannelService {
   private static instance: ChannelService
   private channelRepository: ChannelRepository
   private telegramApi: TelegramBotAPI
-  private permissionsService: ReturnType<typeof getChannelPermissionsService>
 
   private constructor() {
     this.channelRepository = ChannelRepository.getInstance()
     this.telegramApi = new TelegramBotAPI()
-    this.permissionsService = getChannelPermissionsService()
   }
 
   public static getInstance(): ChannelService {
@@ -33,10 +27,22 @@ export class ChannelService {
   }
 
   /**
-   * Подключение канала с автоматической синхронизацией прав
+   * Подключение канала (упрощенная версия)
    */
   async connectChannel(request: ChannelConnectionRequest): Promise<ChannelConnectionResponse> {
     try {
+      // 0. Проверка токена Telegram Bot API
+      try {
+        await this.telegramApi.getMe()
+      } catch (error) {
+        console.error('Telegram Bot API authentication failed:', error)
+        return {
+          success: false,
+          error: 'Ошибка аутентификации Telegram Bot API',
+          error_code: ChannelConnectionErrorCode.TELEGRAM_API_ERROR
+        }
+      }
+
       // 1. Валидация идентификатора
       const validation = validateChannelIdentifier(request.identifier)
       if (!validation.is_valid) {
@@ -68,8 +74,11 @@ export class ChannelService {
         }
       }
 
-      // 4. Проверка существующего подключения
-      const existingChannel = await this.channelRepository.getByTelegramId(chatInfo.id.toString())
+      // 4. Проверка существующего подключения для этого пользователя
+      const existingChannel = await this.channelRepository.getByTelegramId(
+        chatInfo.id.toString(), 
+        request.user_id
+      )
       if (existingChannel) {
         return {
           success: false,
@@ -78,27 +87,7 @@ export class ChannelService {
         }
       }
 
-      // 5. Проверка прав бота
-      const botMember = await this.telegramApi.getChatMember(normalizedId, parseInt(process.env.TELEGRAM_BOT_ID!))
-      if (!botMember || !['creator', 'administrator'].includes(botMember.status)) {
-        return {
-          success: false,
-          error: getChannelErrorMessage(ChannelConnectionErrorCode.BOT_NOT_ADMIN),
-          error_code: ChannelConnectionErrorCode.BOT_NOT_ADMIN
-        }
-      }
-
-      // 6. Проверка прав пользователя
-      const userMember = await this.telegramApi.getChatMember(normalizedId, parseInt(request.user_id))
-      if (!userMember || !['creator', 'administrator'].includes(userMember.status)) {
-        return {
-          success: false,
-          error: getChannelErrorMessage(ChannelConnectionErrorCode.USER_NOT_ADMIN),
-          error_code: ChannelConnectionErrorCode.USER_NOT_ADMIN
-        }
-      }
-
-      // 7. Создание канала в БД
+      // 5. Создание канала в БД
       const channelData = {
         telegram_channel_id: chatInfo.id.toString(),
         channel_title: chatInfo.title || 'Без названия',
@@ -109,22 +98,11 @@ export class ChannelService {
 
       const channel = await this.channelRepository.create(channelData)
 
-      // 8. Синхронизация прав пользователя
-      await this.permissionsService.syncChannelPermissions({ channel_id: channel.id })
-
-      // 9. Получение канала с правами
-      const channelWithPermissions = await this.channelRepository.getByIdWithPermissions(
-        channel.id, 
-        request.user_id
-      )
-
       return {
         success: true,
-        channel: channelWithPermissions!,
+        channel: channel,
         telegram_data: {
-          chat: chatInfo,
-          user_member: userMember,
-          bot_member: botMember
+          chat: chatInfo
         }
       }
 
@@ -148,39 +126,38 @@ export class ChannelService {
   }
 
   /**
-   * Получение каналов пользователя с фильтрацией по правам
+   * Получение каналов пользователя
    */
-  async getUserAccessibleChannels(userId: string, filters: ChannelFilters = {}) {
-    return this.channelRepository.getUserAccessibleChannels(userId, filters)
+  async getUserChannels(userId: string, filters: ChannelFilters = {}) {
+    return this.channelRepository.getUserChannels(userId, filters)
   }
 
   /**
-   * Получение канала по ID с проверкой прав
+   * Получение канала по ID
    */
-  async getChannelById(channelId: string, userId: string): Promise<ChannelWithPermissions | null> {
-    return this.channelRepository.getByIdWithPermissions(channelId, userId)
+  async getChannelById(channelId: string, userId: string) {
+    const channel = await this.channelRepository.getById(channelId)
+    
+    // Проверяем, что канал принадлежит пользователю
+    if (!channel || channel.user_id !== userId) {
+      return null
+    }
+    
+    return channel
   }
 
   /**
    * Обновление канала
    */
-  async updateChannel(channelId: string, userId: string, updateData: any): Promise<ChannelWithPermissions | null> {
+  async updateChannel(channelId: string, userId: string, updateData: any) {
     // Проверка прав пользователя
-    const channel = await this.channelRepository.getByIdWithPermissions(channelId, userId)
-    if (!channel) {
+    const channel = await this.channelRepository.getById(channelId)
+    if (!channel || channel.user_id !== userId) {
       throw new Error('Канал не найден или у вас нет прав доступа')
     }
 
-    // Проверка прав на изменение настроек канала
-    if (!channel.user_permissions?.can_change_info && channel.user_permissions?.telegram_status !== 'creator') {
-      throw new Error('У вас нет прав на изменение настроек канала')
-    }
-
     // Обновление канала
-    await this.channelRepository.update(channelId, updateData)
-    
-    // Возврат обновленного канала
-    return this.channelRepository.getByIdWithPermissions(channelId, userId)
+    return this.channelRepository.update(channelId, updateData)
   }
 
   /**
@@ -188,14 +165,9 @@ export class ChannelService {
    */
   async disconnectChannel(channelId: string, userId: string): Promise<void> {
     // Проверка прав пользователя
-    const channel = await this.channelRepository.getByIdWithPermissions(channelId, userId)
-    if (!channel) {
+    const channel = await this.channelRepository.getById(channelId)
+    if (!channel || channel.user_id !== userId) {
       throw new Error('Канал не найден или у вас нет прав доступа')
-    }
-
-    // Только создатель может отключить канал
-    if (channel.user_permissions?.telegram_status !== 'creator') {
-      throw new Error('Только создатель канала может его отключить')
     }
 
     // Soft delete канала
@@ -203,170 +175,9 @@ export class ChannelService {
   }
 
   /**
-   * Синхронизация прав канала
+   * Поиск каналов
    */
-  async syncChannelPermissions(channelId: string, userId: string): Promise<ChannelSyncResult> {
-    try {
-      // Проверка доступа к каналу
-      const channel = await this.channelRepository.getByIdWithPermissions(channelId, userId)
-      if (!channel) {
-        throw new Error('Канал не найден или у вас нет прав доступа')
-      }
-
-      // Синхронизация прав
-      const syncResult = await this.permissionsService.syncChannelPermissions({ channel_id: channelId })
-
-      return {
-        success: syncResult.success,
-        channel_id: channelId,
-        permissions_updated: syncResult.synced_permissions > 0,
-        stats_updated: false, // TODO: implement stats sync
-        errors: syncResult.errors,
-        sync_timestamp: new Date().toISOString()
-      }
-
-    } catch (error) {
-      return {
-        success: false,
-        channel_id: channelId,
-        permissions_updated: false,
-        stats_updated: false,
-        errors: [error instanceof Error ? error.message : 'Неизвестная ошибка'],
-        sync_timestamp: new Date().toISOString()
-      }
-    }
-  }
-
-  /**
-   * Проверка статуса канала и доступности
-   */
-  async verifyChannelStatus(channelId: string, userId: string): Promise<ChannelVerification> {
-    try {
-      // Получение канала из БД
-      const channel = await this.channelRepository.getByIdWithPermissions(channelId, userId)
-      if (!channel) {
-        throw new Error('Канал не найден или у вас нет прав доступа')
-      }
-
-      // Проверка доступности в Telegram
-      const chatInfo = await this.telegramApi.getChat(channel.telegram_channel_id)
-      const isAccessible = !!chatInfo
-
-      let botIsAdmin = false
-      let userPermissions = null
-      let memberCount = 0
-
-      if (isAccessible) {
-        // Проверка прав бота
-        try {
-          const botMember = await this.telegramApi.getChatMember(
-            channel.telegram_channel_id, 
-            parseInt(process.env.TELEGRAM_BOT_ID!)
-          )
-          botIsAdmin = botMember && ['creator', 'administrator'].includes(botMember.status)
-        } catch {
-          botIsAdmin = false
-        }
-
-        // Получение прав пользователя
-        try {
-          userPermissions = await this.permissionsService.getUserChannelPermissions(userId, channelId)
-        } catch {
-          userPermissions = null
-        }
-
-        // Подсчет участников (если есть права)
-        try {
-          const administrators = await this.telegramApi.getChatAdministrators(channel.telegram_channel_id)
-          memberCount = administrators?.length || 0
-        } catch {
-          memberCount = 0
-        }
-      }
-
-      // Обновление статуса в БД
-      await this.channelRepository.updateStatus(
-        channelId,
-        isAccessible && botIsAdmin,
-        isAccessible ? undefined : 'Канал недоступен или бот не является администратором'
-      )
-
-      return {
-        channel_id: channelId,
-        is_accessible: isAccessible,
-        bot_is_admin: botIsAdmin,
-        user_permissions: userPermissions,
-        member_count: memberCount,
-        last_verified_at: new Date().toISOString()
-      }
-
-    } catch (error) {
-      await this.channelRepository.updateStatus(
-        channelId,
-        false,
-        error instanceof Error ? error.message : 'Ошибка проверки статуса'
-      )
-
-      return {
-        channel_id: channelId,
-        is_accessible: false,
-        bot_is_admin: false,
-        user_permissions: null,
-        member_count: 0,
-        last_verified_at: new Date().toISOString(),
-        verification_error: error instanceof Error ? error.message : 'Ошибка проверки статуса'
-      }
-    }
-  }
-
-  /**
-   * Поиск каналов пользователя
-   */
-  async searchChannels(userId: string, query: string, limit: number = 20): Promise<ChannelWithPermissions[]> {
-    if (!query || query.trim().length < 2) {
-      return []
-    }
-
-    return this.channelRepository.search(query.trim(), userId, limit)
-  }
-
-  /**
-   * Получение статистики канала
-   */
-  async getChannelStats(channelId: string, userId: string) {
-    // Проверка доступа
-    const channel = await this.channelRepository.getByIdWithPermissions(channelId, userId)
-    if (!channel) {
-      throw new Error('Канал не найден или у вас нет прав доступа')
-    }
-
-    return this.channelRepository.getChannelStats(channelId)
-  }
-
-  /**
-   * Массовая синхронизация каналов пользователя
-   */
-  async bulkSyncUserChannels(userId: string): Promise<ChannelSyncResult[]> {
-    const { channels } = await this.channelRepository.getUserAccessibleChannels(userId, { limit: 100 })
-    
-    const results: ChannelSyncResult[] = []
-    
-    for (const channel of channels) {
-      try {
-        const result = await this.syncChannelPermissions(channel.id, userId)
-        results.push(result)
-      } catch (error) {
-        results.push({
-          success: false,
-          channel_id: channel.id,
-          permissions_updated: false,
-          stats_updated: false,
-          errors: [error instanceof Error ? error.message : 'Ошибка синхронизации'],
-          sync_timestamp: new Date().toISOString()
-        })
-      }
-    }
-
-    return results
+  async searchChannels(userId: string, query: string, limit: number = 20) {
+    return this.channelRepository.search(query, userId, limit)
   }
 } 

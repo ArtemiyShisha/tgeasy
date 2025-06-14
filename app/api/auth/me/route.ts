@@ -7,23 +7,26 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = cookies()
-    const supabase = createClient()
+    
+    // Проверяем cookies аутентификации
+    const userId = cookieStore.get('user_id')?.value
+    const telegramId = cookieStore.get('telegram_id')?.value
 
-    // Получаем текущую сессию
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-    if (sessionError || !session) {
+    if (!userId || !telegramId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
+    // Создаем Supabase client для работы с БД
+    const supabase = createClient()
+
     // Получаем данные пользователя из нашей таблицы
     const { data: user, error: userError } = await (supabase as any)
       .from('users')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', userId)
       .single()
 
     if (userError || !user) {

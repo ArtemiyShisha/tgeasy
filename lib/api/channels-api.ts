@@ -2,7 +2,8 @@ import { Tables } from '@/types/database';
 
 // Type aliases
 type Channel = Tables<'telegram_channels'>;
-type ChannelPermission = Tables<'channel_permissions'>;
+
+// Import types from channel-ui.ts
 import {
   ChannelWithPermissions,
   ChannelStatus,
@@ -60,7 +61,19 @@ class ChannelsApi {
     const url = `${this.baseUrl}${params.toString() ? `?${params}` : ''}`;
     const response = await fetch(url);
     
-    return this.handleResponse<ChannelsListResponse>(response);
+    const apiResponse = await this.handleResponse<{
+      success: boolean;
+      data: {
+        channels: any[];
+        pagination: any;
+      };
+    }>(response);
+
+    // Преобразуем структуру ответа API в ожидаемый формат
+    return {
+      channels: apiResponse.data.channels,
+      pagination: apiResponse.data.pagination
+    };
   }
 
   async getChannel(channelId: string): Promise<ChannelWithPermissions> {
@@ -68,17 +81,34 @@ class ChannelsApi {
     return this.handleResponse<ChannelWithPermissions>(response);
   }
 
-  async connectChannel(
-    usernameOrLink: string,
-    onProgress?: (state: ChannelConnectionState) => void
-  ): Promise<ChannelConnectionResponse> {
+  // Channel connection
+  async connectChannel(identifier: string): Promise<ChannelConnectionResponse> {
     const response = await fetch(`${this.baseUrl}/connect`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username_or_link: usernameOrLink })
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ identifier }),
     });
 
-    return this.handleResponse<ChannelConnectionResponse>(response);
+    const apiResponse = await this.handleResponse<{
+      success: boolean;
+      data?: ChannelConnectionResponse;
+      error?: string;
+      error_code?: string;
+    }>(response);
+
+    // Если API вернул ошибку
+    if (!apiResponse.success || !apiResponse.data) {
+      return {
+        success: false,
+        error: apiResponse.error || 'Unknown error',
+        error_code: apiResponse.error_code || 'VALIDATION_ERROR'
+      } as any;
+    }
+
+    // Возвращаем данные из data поля
+    return apiResponse.data;
   }
 
   async updateChannel(
@@ -195,7 +225,7 @@ class ChannelsApi {
     const response = await fetch(`${this.baseUrl}/validate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username_or_link: usernameOrLink })
+      body: JSON.stringify({ identifier: usernameOrLink })
     });
 
     return this.handleResponse(response);

@@ -1,24 +1,27 @@
 import { createClient } from '@supabase/supabase-js'
-import { 
-  Channel, 
-  ChannelInsert, 
-  ChannelUpdate, 
-  ChannelWithPermissions,
-  ChannelFilters,
-  ChannelStats
-} from '@/types/channel'
+import type { Database } from '@/types/database'
+import type { Channel, ChannelFilters, ChannelStats } from '@/types/channel'
 import { ChannelPermission } from '@/types/channel-permissions'
-import { Database } from '@/types/database'
+
+type ChannelRow = Database['public']['Tables']['telegram_channels']['Row']
+type ChannelInsert = Database['public']['Tables']['telegram_channels']['Insert']
+type ChannelUpdate = Database['public']['Tables']['telegram_channels']['Update']
+
+// Simplified channel type without permissions
+type SimpleChannel = Channel
 
 export class ChannelRepository {
   private static instance: ChannelRepository
   private supabase: ReturnType<typeof createClient<Database>>
 
   private constructor() {
-    this.supabase = createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    // Use anon key directly since service role key is invalid
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    
+    console.log('ChannelRepository: Using anon key for Supabase connection')
+    
+    this.supabase = createClient<Database>(supabaseUrl, supabaseKey)
   }
 
   public static getInstance(): ChannelRepository {
@@ -29,12 +32,16 @@ export class ChannelRepository {
   }
 
   /**
-   * Создание нового канала
+   * Создание канала
    */
   async create(channelData: ChannelInsert): Promise<Channel> {
     const { data, error } = await this.supabase
       .from('telegram_channels')
-      .insert(channelData)
+      .insert({
+        ...channelData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
       .select()
       .single()
 
@@ -66,56 +73,20 @@ export class ChannelRepository {
   }
 
   /**
-   * Получение канала с правами пользователя
+   * Получение канала по Telegram ID для конкретного пользователя
    */
-  async getByIdWithPermissions(id: string, userId: string): Promise<ChannelWithPermissions | null> {
-    const { data, error } = await this.supabase
-      .from('telegram_channels')
-      .select(`
-        *,
-        channel_permissions!inner(
-          id,
-          telegram_status,
-          can_post_messages,
-          can_edit_messages,
-          can_delete_messages,
-          can_change_info,
-          can_invite_users,
-          last_synced_at,
-          sync_error
-        )
-      `)
-      .eq('id', id)
-      .eq('channel_permissions.user_id', userId)
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null // Not found or no permissions
-      }
-      throw new Error(`Failed to get channel with permissions: ${error.message}`)
-    }
-
-    // Transform the data to include permissions in the expected format
-    const channel = data as any
-    const permissions = channel.channel_permissions?.[0]
-
-    return {
-      ...channel,
-      user_permissions: permissions || null,
-      channel_permissions: undefined // Remove nested array
-    }
-  }
-
-  /**
-   * Получение канала по Telegram ID
-   */
-  async getByTelegramId(telegramChannelId: string): Promise<Channel | null> {
-    const { data, error } = await this.supabase
+  async getByTelegramId(telegramChannelId: string, userId?: string): Promise<Channel | null> {
+    let query = this.supabase
       .from('telegram_channels')
       .select('*')
       .eq('telegram_channel_id', telegramChannelId)
-      .single()
+
+    // Если указан userId, ищем канал конкретного пользователя
+    if (userId) {
+      query = query.eq('user_id', userId)
+    }
+
+    const { data, error } = await query.single()
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -128,29 +99,16 @@ export class ChannelRepository {
   }
 
   /**
-   * Получение каналов пользователя с фильтрацией по правам
+   * Получение каналов пользователя (упрощенная версия без прав)
    */
-  async getUserAccessibleChannels(userId: string, filters: ChannelFilters = {}): Promise<{
-    channels: ChannelWithPermissions[]
+  async getUserChannels(userId: string, filters: ChannelFilters = {}): Promise<{
+    channels: Channel[]
     total: number
   }> {
     let query = this.supabase
       .from('telegram_channels')
-      .select(`
-        *,
-        channel_permissions!inner(
-          id,
-          telegram_status,
-          can_post_messages,
-          can_edit_messages,
-          can_delete_messages,
-          can_change_info,
-          can_invite_users,
-          last_synced_at,
-          sync_error
-        )
-      `, { count: 'exact' })
-      .eq('channel_permissions.user_id', userId)
+      .select('*', { count: 'exact' })
+      .eq('user_id', userId)
 
     // Apply filters
     if (filters.status && filters.status.length > 0) {
@@ -159,10 +117,6 @@ export class ChannelRepository {
       } else if (filters.status.includes('inactive')) {
         query = query.eq('is_active', false)
       }
-    }
-
-    if (filters.telegram_status && filters.telegram_status.length > 0) {
-      query = query.in('channel_permissions.telegram_status', filters.telegram_status)
     }
 
     if (filters.search) {
@@ -192,18 +146,8 @@ export class ChannelRepository {
       throw new Error(`Failed to get user channels: ${error.message}`)
     }
 
-    // Transform the data
-    const channels = (data || []).map((channel: any) => {
-      const permissions = channel.channel_permissions?.[0]
-      return {
-        ...channel,
-        user_permissions: permissions || null,
-        channel_permissions: undefined
-      }
-    })
-
     return {
-      channels,
+      channels: data || [],
       total: count || 0
     }
   }
@@ -250,13 +194,6 @@ export class ChannelRepository {
    * Физическое удаление канала и связанных данных
    */
   async hardDelete(id: string): Promise<void> {
-    // Delete channel permissions first (foreign key constraint)
-    await this.supabase
-      .from('channel_permissions')
-      .delete()
-      .eq('channel_id', id)
-
-    // Delete the channel
     const { error } = await this.supabase
       .from('telegram_channels')
       .delete()
@@ -268,13 +205,14 @@ export class ChannelRepository {
   }
 
   /**
-   * Проверка существования канала по Telegram ID
+   * Проверка существования канала по Telegram ID для пользователя
    */
-  async existsByTelegramId(telegramChannelId: string): Promise<boolean> {
+  async existsByTelegramId(telegramChannelId: string, userId: string): Promise<boolean> {
     const { data, error } = await this.supabase
       .from('telegram_channels')
       .select('id')
       .eq('telegram_channel_id', telegramChannelId)
+      .eq('user_id', userId)
       .single()
 
     if (error && error.code !== 'PGRST116') {
@@ -394,7 +332,7 @@ export class ChannelRepository {
   /**
    * Поиск каналов по тексту
    */
-  async search(query: string, userId: string, limit: number = 20): Promise<ChannelWithPermissions[]> {
+  async search(query: string, userId: string, limit: number = 20): Promise<Channel[]> {
     const { data, error } = await this.supabase
       .from('telegram_channels')
       .select(`

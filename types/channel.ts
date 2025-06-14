@@ -23,6 +23,7 @@ export interface ChannelWithPermissions extends Channel {
 export interface ChannelConnectionRequest {
   identifier: string // username (@channel) or invite link
   user_id: string
+  telegram_id?: string // Telegram user ID для проверки прав
   verify_admin_rights?: boolean
 }
 
@@ -34,8 +35,8 @@ export interface ChannelConnectionResponse {
   error_code?: ChannelConnectionErrorCode
   telegram_data?: {
     chat: TelegramChat
-    user_member: TelegramChatMember
-    bot_member: TelegramChatMember
+    user_member?: TelegramChatMember
+    bot_member?: TelegramChatMember
   }
 }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ChannelService } from '@/lib/services/channel-service'
+import { getChannelPermissionsService } from '@/lib/services/channel-permissions-service'
 import { ChannelUpdateSchema } from '@/utils/channel-validation'
 
 interface RouteParams {
@@ -152,8 +153,22 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Временно используем фиксированный user_id пока не настроена аутентификация
     const user_id = '1' // TODO: получить из session
 
+    // Проверяем доступ к каналу
     const channelService = ChannelService.getInstance()
-    const syncResult = await channelService.syncChannelPermissions(params.id, user_id)
+    const channel = await channelService.getChannelById(params.id, user_id)
+    if (!channel) {
+      return NextResponse.json(
+        { error: 'Канал не найден или у вас нет прав доступа' },
+        { status: 404 }
+      )
+    }
+
+    // Синхронизируем права через permissions service
+    const permissionsService = getChannelPermissionsService()
+    const syncResult = await permissionsService.syncChannelPermissions({
+      channel_id: params.id,
+      force_sync: true
+    })
 
     return NextResponse.json({
       success: syncResult.success,

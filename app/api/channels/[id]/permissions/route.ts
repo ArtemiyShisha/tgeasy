@@ -64,6 +64,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { force_sync = false } = body;
 
     const channelService = ChannelService.getInstance();
+    const permissionsService = getChannelPermissionsService();
     
     // Проверка доступа пользователя к каналу
     const channel = await channelService.getChannelById(params.id, user_id);
@@ -75,7 +76,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Синхронизация прав
-    const syncResult = await channelService.syncChannelPermissions(params.id, user_id);
+    const syncResult = await permissionsService.syncChannelPermissions({
+      channel_id: params.id,
+      force_sync
+    });
 
     return NextResponse.json({
       success: syncResult.success,

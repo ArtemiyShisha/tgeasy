@@ -66,9 +66,15 @@ export interface ChannelFilters {
 // API response types
 export interface ChannelsListResponse {
   channels: ChannelWithPermissions[];
-  total: number;
+  total?: number;
   hasMore?: boolean;
   nextCursor?: string;
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
 }
 
 export interface ChannelConnectionResponse {

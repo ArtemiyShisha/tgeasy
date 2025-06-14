@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import type { UserSession } from '@/types/auth'
 
 /**
@@ -7,32 +8,46 @@ import type { UserSession } from '@/types/auth'
  */
 export async function getCurrentSession(): Promise<UserSession | null> {
   try {
-    const supabase = createClient()
-    const { data: { user }, error } = await supabase.auth.getUser()
+    // Получаем user_id из cookies (наша система аутентификации)
+    const cookieStore = cookies()
+    const userId = cookieStore.get('user_id')?.value
 
-    if (error || !user) {
+    if (!userId) {
       return null
     }
 
-    // Создаем UserSession из данных auth.users
+    // Получаем данные пользователя из нашей таблицы users
+    const supabase = createClient()
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (error || !user) {
+      console.error('Failed to get user from database:', error)
+      return null
+    }
+
+    // Создаем UserSession из данных нашей таблицы users
     const userSession: UserSession = {
       id: user.id,
-      telegram_id: user.user_metadata?.telegram_id || 0,
-      telegram_username: user.user_metadata?.telegram_username || null,
-      telegram_first_name: user.user_metadata?.telegram_first_name || null,
-      telegram_last_name: user.user_metadata?.telegram_last_name || null,
+      telegram_id: user.telegram_id || 0,
+      telegram_username: user.telegram_username || null,
+      telegram_first_name: user.telegram_first_name || null,
+      telegram_last_name: user.telegram_last_name || null,
       email: user.email || null,
-      company_name: null,
+      company_name: user.company_name || null,
       created_at: user.created_at,
       updated_at: user.updated_at || null,
-      last_login_at: user.last_sign_in_at || null,
-      role: user.app_metadata?.role || 'user',
+      last_login_at: user.last_login_at || null,
+      role: 'user', // В нашей системе пока все пользователи обычные
       
       // Вычисляемые поля
       display_name: (() => {
-        const firstName = user.user_metadata?.telegram_first_name
-        const lastName = user.user_metadata?.telegram_last_name
-        const username = user.user_metadata?.telegram_username
+        const firstName = user.telegram_first_name
+        const lastName = user.telegram_last_name
+        const username = user.telegram_username
         
         if (firstName) {
           return lastName ? `${firstName} ${lastName}` : firstName
@@ -44,7 +59,7 @@ export async function getCurrentSession(): Promise<UserSession | null> {
         
         return 'Пользователь'
       })(),
-      avatar_url: user.user_metadata?.avatar_url || null
+      avatar_url: undefined // Пока не используем аватары
     }
 
     return userSession
