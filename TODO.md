@@ -667,20 +667,22 @@ CALLBACK: Loading spinner, success/error states, автоматический re
 
 ---
 
-### Задача 10: Telegram-native система прав доступа
+### Задача 10: Telegram-native система прав доступа ✅ ЗАВЕРШЕНО
 
 **Модуль**: Users  
 **Приоритет**: Критический  
 **Зависимости**: Задача 9  
-**Время**: 60 минут  
+**Время**: 60 минут → **ФАКТИЧЕСКИ: ~3 часа** (включая отладку TypeScript и схемы БД)
 
-**Файлы для создания**:
-- `lib/services/channel-permissions-service.ts`
-- `lib/repositories/channel-permissions-repository.ts`
-- `app/api/channels/[id]/permissions/route.ts`
-- `lib/integrations/telegram/permissions.ts`
-- `types/channel-permissions.ts`
-- `utils/telegram-permissions.ts`
+**Файлы созданы**:
+- ✅ `lib/services/channel-permissions-service.ts` - сервис синхронизации прав
+- ✅ `lib/repositories/channel-permissions-repository.ts` - repository для БД операций
+- ✅ `app/api/channels/[id]/permissions/route.ts` - API endpoints для прав
+- ✅ `lib/integrations/telegram/permissions.ts` - Telegram API интеграция
+- ✅ `types/channel-permissions.ts` - comprehensive типы
+- ✅ `utils/telegram-permissions.ts` - утилиты работы с правами
+- ✅ `utils/channel-permissions-helpers.ts` - UI helpers
+- ✅ `types/database.ts` - **ОБНОВЛЕН** под новую схему channel_permissions
 
 **Описание**:
 Система управления правами доступа на основе Telegram-native ролей. Пользователи получают те же права в TGeasy, что и в Telegram каналах.
@@ -700,11 +702,56 @@ CALLBACK: Loading spinner, success/error states, автоматический re
 - Упрощенная модель данных
 
 **Критерии готовности**:
-- [ ] Telegram API проверяет права пользователей
-- [ ] Права синхронизируются при подключении канала
-- [ ] Периодическое обновление прав работает
-- [ ] Пользователи видят только доступные каналы
-- [ ] Права наследуются из Telegram
+- [x] Telegram API проверяет права пользователей
+- [x] Права синхронизируются при подключении канала
+- [x] Периодическое обновление прав работает
+- [x] Пользователи видят только доступные каналы
+- [x] Права наследуются из Telegram
+
+**⚠️ АРХИТЕКТУРНЫЕ ИЗМЕНЕНИЯ В ПРОЦЕССЕ РАЗРАБОТКИ:**
+
+**Проблема 1: Схема БД не соответствовала типам**
+- **Причина**: Старая схема `channel_permissions` с полем `role` vs новая с `telegram_status` + детальными правами
+- **Решение**: Пересоздали таблицу через MCP с правильной структурой, обновили типы в `types/database.ts`
+
+**Проблема 2: TypeScript ошибки компиляции**
+- **Причина**: Несоответствие сгенерированных типов реальной схеме БД
+- **Решение**: Ручное обновление типов + исправление дублированных функций в repository
+
+**Проблема 3: Отсутствие пакета zod**
+- **Причина**: API validation требовал zod, но пакет не был установлен
+- **Решение**: `npm install zod` + правильная валидация в API endpoints
+
+**ФИНАЛЬНАЯ АРХИТЕКТУРА ПРАВ:**
+
+1. **Telegram-native синхронизация**:
+   ```
+   Telegram API → getChatAdministrators() → Mapping в TGeasy права → 
+   Сохранение в БД → Автоматическая фильтрация каналов
+   ```
+
+2. **Структура прав**:
+   - `telegram_status`: 'creator' | 'administrator'
+   - Детальные права: `can_post_messages`, `can_edit_messages`, etc.
+   - Синхронизация: `last_synced_at`, `sync_error`
+
+3. **API endpoints**:
+   - `GET /api/channels/[id]/permissions` - получение прав
+   - `POST /api/channels/[id]/permissions` - синхронизация с Telegram
+   - `DELETE /api/channels/[id]/permissions` - удаление прав (только creator)
+
+4. **Безопасность**:
+   - Проверка прав на каждом endpoint
+   - Rate limiting для Telegram API
+   - Валидация через zod schemas
+
+**Lessons Learned**:
+1. **MCP схемы** требуют ручной синхронизации с TypeScript типами
+2. **Telegram API** integration требует careful error handling и rate limiting
+3. **Repository pattern** с singleton instances работает хорошо для сервисов
+4. **Comprehensive типизация** критична для сложных систем прав доступа
+
+**Результат**: **PRODUCTION READY** система Telegram-native прав доступа готова для интеграции с UI
 
 **Telegram права и их mapping в TGeasy**:
 ```typescript

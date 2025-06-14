@@ -58,27 +58,48 @@ export type Database = {
       }
       channel_permissions: {
         Row: {
+          can_change_info: boolean | null
+          can_delete_messages: boolean | null
+          can_edit_messages: boolean | null
+          can_invite_users: boolean | null
+          can_post_messages: boolean | null
           channel_id: string
-          granted_at: string | null
-          granted_by: string | null
+          created_at: string | null
           id: string
-          role: Database["public"]["Enums"]["channel_role"]
+          last_synced_at: string | null
+          sync_error: string | null
+          telegram_status: string
+          updated_at: string | null
           user_id: string
         }
         Insert: {
+          can_change_info?: boolean | null
+          can_delete_messages?: boolean | null
+          can_edit_messages?: boolean | null
+          can_invite_users?: boolean | null
+          can_post_messages?: boolean | null
           channel_id: string
-          granted_at?: string | null
-          granted_by?: string | null
+          created_at?: string | null
           id?: string
-          role: Database["public"]["Enums"]["channel_role"]
+          last_synced_at?: string | null
+          sync_error?: string | null
+          telegram_status: string
+          updated_at?: string | null
           user_id: string
         }
         Update: {
+          can_change_info?: boolean | null
+          can_delete_messages?: boolean | null
+          can_edit_messages?: boolean | null
+          can_invite_users?: boolean | null
+          can_post_messages?: boolean | null
           channel_id?: string
-          granted_at?: string | null
-          granted_by?: string | null
+          created_at?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["channel_role"]
+          last_synced_at?: string | null
+          sync_error?: string | null
+          telegram_status?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
