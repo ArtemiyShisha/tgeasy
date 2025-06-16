@@ -1,4 +1,3 @@
-
 export type Json =
   | string
   | number
@@ -694,6 +693,7 @@ export type Database = {
           channel_title: string
           channel_username: string | null
           created_at: string | null
+          disconnected_by_users: string[] | null
           error_message: string | null
           id: string
           is_active: boolean
@@ -706,6 +706,7 @@ export type Database = {
           channel_title: string
           channel_username?: string | null
           created_at?: string | null
+          disconnected_by_users?: string[] | null
           error_message?: string | null
           id?: string
           is_active?: boolean
@@ -718,6 +719,7 @@ export type Database = {
           channel_title?: string
           channel_username?: string | null
           created_at?: string | null
+          disconnected_by_users?: string[] | null
           error_message?: string | null
           id?: string
           is_active?: boolean
@@ -796,6 +798,7 @@ export type Database = {
           email: string | null
           id: string
           last_login_at: string | null
+          telegram_activated: boolean
           telegram_first_name: string | null
           telegram_id: number
           telegram_last_name: string | null
@@ -808,6 +811,7 @@ export type Database = {
           email?: string | null
           id?: string
           last_login_at?: string | null
+          telegram_activated?: boolean
           telegram_first_name?: string | null
           telegram_id: number
           telegram_last_name?: string | null
@@ -820,6 +824,7 @@ export type Database = {
           email?: string | null
           id?: string
           last_login_at?: string | null
+          telegram_activated?: boolean
           telegram_first_name?: string | null
           telegram_id?: number
           telegram_last_name?: string | null
@@ -986,7 +991,6 @@ export type Database = {
       }
     }
     Enums: {
-      channel_role: "owner" | "editor" | "viewer"
       notification_type:
         | "post_created"
         | "post_published"
@@ -1002,6 +1006,7 @@ export type Database = {
       post_status: "draft" | "scheduled" | "published" | "failed" | "archived"
       subscription_plan: "FREE" | "BASIC" | "PRO" | "BUSINESS"
       subscription_status: "active" | "canceled" | "past_due" | "trialing"
+      telegram_user_status: "creator" | "administrator"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1120,7 +1125,6 @@ export const Constants = {
   },
   public: {
     Enums: {
-      channel_role: ["owner", "editor", "viewer"],
       notification_type: [
         "post_created",
         "post_published",
@@ -1137,6 +1141,7 @@ export const Constants = {
       post_status: ["draft", "scheduled", "published", "failed", "archived"],
       subscription_plan: ["FREE", "BASIC", "PRO", "BUSINESS"],
       subscription_status: ["active", "canceled", "past_due", "trialing"],
+      telegram_user_status: ["creator", "administrator"],
     },
   },
 } as const

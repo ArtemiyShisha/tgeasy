@@ -235,7 +235,7 @@ export function useChannels(options: UseChannelsOptions = {}): UseChannelsReturn
     setChannels(prev => prev.filter(channel => channel.id !== channelId));
 
     try {
-      await channelsApi.disconnectChannel(channelId);
+      await channelsApi.disconnectUserFromChannel(channelId);
     } catch (err) {
       console.error('Failed to disconnect channel:', err);
       setError(getErrorMessage(err));

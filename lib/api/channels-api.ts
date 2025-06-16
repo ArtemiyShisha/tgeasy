@@ -132,6 +132,14 @@ class ChannelsApi {
     await this.handleResponse<void>(response);
   }
 
+  async disconnectUserFromChannel(channelId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/${channelId}/disconnect`, {
+      method: 'POST'
+    });
+
+    await this.handleResponse<void>(response);
+  }
+
   async verifyChannel(channelId: string): Promise<ChannelStatus> {
     const response = await fetch(`${this.baseUrl}/${channelId}/verify`, {
       method: 'POST'

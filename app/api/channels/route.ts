@@ -3,20 +3,15 @@ import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/session'
 import { ChannelService } from '@/lib/services/channel-service'
 import { ChannelFiltersSchema } from '@/utils/channel-validation'
+import { getUserIdFromRequest } from '@/lib/auth/api-helpers'
 
 /**
  * GET /api/channels - Получение каналов пользователя с фильтрацией по правам
  */
 export async function GET(request: NextRequest) {
   try {
-    // Проверка аутентификации
-    const session = await requireAuth()
-    if (!session?.id) {
-      return NextResponse.json(
-        { error: 'Неавторизованный запрос' },
-        { status: 401 }
-      )
-    }
+    // Получаем user_id из аутентифицированного запроса
+    const user_id = await getUserIdFromRequest(request)
 
     // Парсинг query параметров
     const url = new URL(request.url)
@@ -47,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Получение каналов
     const channelService = ChannelService.getInstance()
     const result = await channelService.getUserChannels(
-      session.id,
+      user_id,
       validation.data
     )
 

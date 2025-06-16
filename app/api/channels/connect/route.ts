@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ChannelService } from '@/lib/services/channel-service'
 import { ChannelConnectionRequestSchema } from '@/utils/channel-validation'
 import { ChannelConnectionRequest } from '@/types/channel'
-import { requireAuth } from '@/lib/auth/session'
+import { getUserIdFromRequest } from '@/lib/auth/api-helpers'
 
 /**
  * POST /api/channels/connect - Подключение канала (упрощенная версия)
@@ -18,23 +18,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Проверка аутентификации
-    const session = await requireAuth()
-    if (!session?.id) {
-      return NextResponse.json(
-        { error: 'Неавторизованный запрос' },
-        { status: 401 }
-      )
-    }
+    // Получаем user_id из аутентифицированного запроса (с fallback)
+    const user_id = await getUserIdFromRequest(request)
 
     // Парсим тело запроса
     const body = await request.json()
     
-    // Создаем объект запроса с user_id из сессии
+    // Создаем объект запроса с user_id
     const connectionRequest: ChannelConnectionRequest = {
       identifier: body.identifier,
       verify_admin_rights: body.verify_admin_rights || false,
-      user_id: session.id
+      user_id: user_id
     }
     
     // Валидируем запрос

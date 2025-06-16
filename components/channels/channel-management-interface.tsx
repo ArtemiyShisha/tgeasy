@@ -287,8 +287,11 @@ export function ChannelManagementInterface() {
   const handleDisconnect = async (channelId: string) => {
     try {
       await disconnectChannel(channelId);
+      // TODO: Добавить toast уведомление об успехе
+      console.log('Channel disconnected successfully');
     } catch (error) {
       console.error('Failed to disconnect channel:', error);
+      // TODO: Добавить toast уведомление об ошибке 
     }
   };
 

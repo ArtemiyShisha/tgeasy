@@ -73,7 +73,7 @@ export class ChannelRepository {
   }
 
   /**
-   * Получение канала по Telegram ID для конкретного пользователя
+   * Получение канала по Telegram ID (ищет любой канал с этим ID, включая отключенные)
    */
   async getByTelegramId(telegramChannelId: string, userId?: string): Promise<Channel | null> {
     let query = this.supabase
@@ -81,7 +81,8 @@ export class ChannelRepository {
       .select('*')
       .eq('telegram_channel_id', telegramChannelId)
 
-    // Если указан userId, ищем канал конкретного пользователя
+    // Если указан userId, ищем канал этого пользователя ИЛИ любой существующий канал
+    // (для reconnection нужно найти канал даже если он отключен)
     if (userId) {
       query = query.eq('user_id', userId)
     }
@@ -109,6 +110,8 @@ export class ChannelRepository {
       .from('telegram_channels')
       .select('*', { count: 'exact' })
       .eq('user_id', userId)
+      .eq('is_active', true)
+      .not('disconnected_by_users', 'cs', `{${userId}}`)
 
     // Apply filters
     if (filters.status && filters.status.length > 0) {
@@ -201,6 +204,72 @@ export class ChannelRepository {
 
     if (error) {
       throw new Error(`Failed to hard delete channel: ${error.message}`)
+    }
+  }
+
+  /**
+   * Отключение пользователя от канала (добавляет в список отключенных)
+   */
+  async disconnectUserFromChannel(channelId: string, userId: string): Promise<void> {
+    // Получаем текущий список отключенных пользователей
+    const { data: channel, error: fetchError } = await this.supabase
+      .from('telegram_channels')
+      .select('disconnected_by_users')
+      .eq('id', channelId)
+      .single()
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch channel: ${fetchError.message}`)
+    }
+
+    // Добавляем пользователя в список отключенных (если его там еще нет)
+    const disconnectedUsers = channel.disconnected_by_users || []
+    if (!disconnectedUsers.includes(userId)) {
+      disconnectedUsers.push(userId)
+
+      const { error: updateError } = await this.supabase
+        .from('telegram_channels')
+        .update({
+          disconnected_by_users: disconnectedUsers,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', channelId)
+
+      if (updateError) {
+        throw new Error(`Failed to disconnect user from channel: ${updateError.message}`)
+      }
+    }
+  }
+
+  /**
+   * Повторное подключение пользователя к каналу (удаляет из списка отключенных)
+   */
+  async reconnectUserToChannel(channelId: string, userId: string): Promise<void> {
+    // Получаем текущий список отключенных пользователей
+    const { data: channel, error: fetchError } = await this.supabase
+      .from('telegram_channels')
+      .select('disconnected_by_users')
+      .eq('id', channelId)
+      .single()
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch channel: ${fetchError.message}`)
+    }
+
+    // Удаляем пользователя из списка отключенных
+    const disconnectedUsers = (channel.disconnected_by_users || [])
+      .filter((id: string) => id !== userId)
+
+    const { error: updateError } = await this.supabase
+      .from('telegram_channels')
+      .update({
+        disconnected_by_users: disconnectedUsers,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', channelId)
+
+    if (updateError) {
+      throw new Error(`Failed to reconnect user to channel: ${updateError.message}`)
     }
   }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ChannelService } from '@/lib/services/channel-service'
 import { getChannelPermissionsService } from '@/lib/services/channel-permissions-service'
 import { ChannelUpdateSchema } from '@/utils/channel-validation'
+import { getUserIdFromRequest } from '@/lib/auth/api-helpers'
 
 interface RouteParams {
   params: {
@@ -14,8 +15,8 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    // Временно используем фиксированный user_id пока не настроена аутентификация
-    const user_id = '1' // TODO: получить из session
+    // Получаем user_id из аутентифицированного запроса
+    const user_id = await getUserIdFromRequest(request)
 
     const channelService = ChannelService.getInstance()
     const channel = await channelService.getChannelById(params.id, user_id)
@@ -49,8 +50,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    // Временно используем фиксированный user_id пока не настроена аутентификация
-    const user_id = '1' // TODO: получить из session
+    // Получаем user_id из аутентифицированного запроса
+    const user_id = await getUserIdFromRequest(request)
 
     // Парсинг тела запроса
     const body = await request.json()
@@ -104,8 +105,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    // Временно используем фиксированный user_id пока не настроена аутентификация
-    const user_id = '1' // TODO: получить из session
+    // Получаем user_id из аутентифицированного запроса
+    const user_id = await getUserIdFromRequest(request)
 
     const channelService = ChannelService.getInstance()
     await channelService.disconnectChannel(params.id, user_id)
@@ -150,8 +151,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    // Временно используем фиксированный user_id пока не настроена аутентификация
-    const user_id = '1' // TODO: получить из session
+    // Получаем user_id из аутентифицированного запроса
+    const user_id = await getUserIdFromRequest(request)
 
     // Проверяем доступ к каналу
     const channelService = ChannelService.getInstance()

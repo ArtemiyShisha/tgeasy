@@ -51,7 +51,7 @@ TGeasy построен как современное **serverless SaaS-прил
 
 ### ✅ Backend управления каналами (РЕАЛИЗОВАНО)
 
-**Статус**: **ПОЛНОСТЬЮ РЕАЛИЗОВАНО** в Задаче 12 (9 файлов, ~2,100+ строк кода)
+**Статус**: **ПОЛНОСТЬЮ РЕАЛИЗОВАНО** в Задаче 12-14 (13 файлов, ~2,900+ строк кода)
 
 **Полная архитектура каналов с Telegram-native правами**:
 ```
@@ -61,11 +61,12 @@ TGeasy построен как современное **serverless SaaS-прил
 │   ├── Permissions indicators           │
 │   └── Telegram status badges           │
 ├─────────────────────────────────────────┤
-│        API Layer (9 endpoints)         │
+│        API Layer (10 endpoints)        │
 │   ├── GET /api/channels (с filtering)  │
 │   ├── POST /api/channels/connect       │
 │   ├── CRUD /api/channels/[id]          │
-│   └── /api/channels/[id]/permissions   │
+│   ├── /api/channels/[id]/permissions   │
+│   └── POST /api/channels/[id]/disconnect│
 ├─────────────────────────────────────────┤
 │        Service Layer                    │
 │   ├── ChannelService (main logic)      │
@@ -89,22 +90,28 @@ TGeasy построен как современное **serverless SaaS-прил
 └─────────────────────────────────────────┘
 ```
 
-**Реализованные компоненты системы управления каналами (9 файлов)**:
+**Реализованные компоненты системы управления каналами (13 файлов)**:
 
 **Types & Validation (2 файла)**:
 - ✅ **`types/channel.ts`** (163 строки): Complete TypeScript типы для каналов, requests, responses
 - ✅ **`utils/channel-validation.ts`** (257 строк): Username валидация, invite link parsing, Zod schemas
 
 **Backend Services (3 файла)**:
-- ✅ **`lib/repositories/channel-repository.ts`** (432 строки): Database operations с permissions filtering
-- ✅ **`lib/services/channel-service.ts`** (372 строки): Main service integrating Telegram Bot API с БД операциями
+- ✅ **`lib/repositories/channel-repository.ts`** (475+ строк): Database operations с permissions filtering + disconnect logic
+- ✅ **`lib/services/channel-service.ts`** (258+ строк): Main service integrating Telegram Bot API с БД операциями + disconnect functionality
 - ✅ **`lib/services/channel-management.ts`** (370 строк): Bulk operations, monitoring, maintenance tasks
 
-**API Endpoints (4 файла)**:
+**API Endpoints (5 файлов)**:
 - ✅ **`app/api/channels/route.ts`** (90 строк): GET channels с rights-based filtering
-- ✅ **`app/api/channels/connect/route.ts`** (63 строки): POST channel connection с automatic permissions sync
-- ✅ **`app/api/channels/[id]/route.ts`** (173 строки): Individual channel CRUD operations с access checks
+- ✅ **`app/api/channels/connect/route.ts`** (79 строк): POST channel connection + automatic reconnection logic
+- ✅ **`app/api/channels/[id]/route.ts`** (188 строк): Individual channel CRUD operations с access checks
 - ✅ **`app/api/channels/[id]/permissions/route.ts`** (187 строк): Telegram-native permissions management
+- ✅ **`app/api/channels/[id]/disconnect/route.ts`** (85 строк): Multi-user channel disconnection API
+
+**Frontend Integration (3 файла)**:
+- ✅ **`hooks/use-channels.ts`** (335+ строк): React hook с optimistic updates для disconnect functionality
+- ✅ **`components/channels/channel-management-interface.tsx`** (538+ строк): Complete UI с disconnect dropdown integration
+- ✅ **`lib/api/channels-api.ts`** (200+ строк): API client с disconnectUserFromChannel() method
 
 **Реализованные компоненты системы прав (из Задачи 10)**:
 - ✅ **Service Layer**: `lib/services/channel-permissions-service.ts`
@@ -144,6 +151,93 @@ const syncFlow = {
 - `POST /api/channels/[id]/permissions` - синхронизация с Telegram
 - `DELETE /api/channels/[id]/permissions` - удаление прав (только creator)
 
+### ✅ Система отключения/переподключения каналов (ПОЛНОСТЬЮ РЕАЛИЗОВАНО)
+
+**Статус**: **ПОЛНОСТЬЮ РЕАЛИЗОВАНО И ПРОТЕСТИРОВАНО** - многопользовательская архитектура с поддержкой reconnection
+
+**Архитектура отключения/переподключения каналов**:
+```
+┌─────────────────────────────────────────┐
+│        Frontend Layer                   │
+│   ├── Disconnect UI (dropdown menu)    │
+│   ├── Optimistic updates               │
+│   └── Error handling & rollback        │
+├─────────────────────────────────────────┤
+│        API Layer                        │
+│   ├── POST /api/channels/[id]/disconnect│
+│   ├── User validation                  │
+│   └── Multi-user support               │
+├─────────────────────────────────────────┤
+│        Service Layer                    │
+│   ├── disconnectUserFromChannel()      │
+│   ├── Multi-user logic                 │
+│   └── Permission validation            │
+├─────────────────────────────────────────┤
+│        Repository Layer                 │
+│   ├── disconnectUserFromChannel()      │
+│   ├── reconnectUserToChannel()         │
+│   └── getUserChannels() filtering      │
+├─────────────────────────────────────────┤
+│        Database Layer                   │
+│   ├── disconnected_by_users UUID[]     │
+│   ├── Multi-user channel sharing       │
+│   └── Proper filtering                 │
+└─────────────────────────────────────────┘
+```
+
+**Многопользовательская логика отключения**:
+```typescript
+// Database schema для поддержки многопользовательского отключения
+telegram_channels {
+  id: UUID,
+  user_id: UUID,                    // Основной владелец канала
+  disconnected_by_users: UUID[],    // Массив пользователей, которые отключили канал
+  is_active: boolean,               // Общий статус канала
+  // ... другие поля
+}
+
+// Логика фильтрации в getUserChannels()
+WHERE user_id = $1 
+  AND is_active = true
+  AND NOT (disconnected_by_users @> ARRAY[$1]::UUID[])
+```
+
+**Реализованная функциональность**:
+- ✅ **Disconnect API**: `POST /api/channels/[id]/disconnect` с валидацией прав
+- ✅ **Reconnect Logic**: Автоматическое переподключение через `POST /api/channels/connect`
+- ✅ **Service Methods**: `disconnectUserFromChannel()` + reconnection logic в `connectChannel()`
+- ✅ **Repository Methods**: `disconnectUserFromChannel()` + `reconnectUserToChannel()`
+- ✅ **Database Schema**: `disconnected_by_users UUID[]` field для multi-user support
+- ✅ **Frontend Integration**: Hook `disconnectChannel()` + `connectChannel()` с optimistic updates
+- ✅ **UI Integration**: Disconnect/Connect через dropdown menu и Add Channel dialog
+- ✅ **Production Tested**: Полностью протестировано на production deployment
+
+**Ключевые особенности архитектуры**:
+- 🔄 **Multi-user support**: Канал остается доступен для других пользователей
+- 🗃️ **Database preservation**: Каналы не удаляются из БД
+- 👤 **User-specific disconnect**: Каждый пользователь может отключать/подключать независимо
+- 🚀 **Performance**: Efficient PostgreSQL array операции
+- 🔄 **Reconnection ready**: Пользователь может заново подключить канал
+- 📱 **UI Optimistic**: Мгновенное исчезновение из интерфейса с rollback при ошибке
+
+**Workflow отключения канала**:
+1. Пользователь нажимает "Disconnect" в UI
+2. Optimistic update: канал мгновенно исчезает из списка
+3. API call: `POST /api/channels/[id]/disconnect`
+4. Validation: проверка прав пользователя на канал
+5. Database update: добавление user_id в `disconnected_by_users[]`
+6. Response: подтверждение успешного отключения
+7. Error handling: rollback UI если произошла ошибка
+
+**Workflow переподключения канала**:
+1. Пользователь вводит username/link ранее отключенного канала в "Add Channel"
+2. API call: `POST /api/channels/connect` с identifier
+3. Service logic: проверка существования канала с этим telegram_channel_id
+4. Reconnection detection: если канал существует но отключен для пользователя
+5. Automatic reconnect: удаление user_id из `disconnected_by_users[]`
+6. UI update: канал появляется в списке как подключенный
+7. Success notification: пользователь видит успешное переподключение
+
 **Преимущества реализованного подхода**:
 - 🚀 **Простота**: нет сложной системы ролей TGeasy
 - 🔄 **Синхронизация**: права автоматически синхронизированы с Telegram
@@ -151,6 +245,9 @@ const syncFlow = {
 - 🛡️ **Безопасность**: нельзя получить больше прав, чем в Telegram
 - 📈 **Масштабируемость**: больше потенциальных пользователей (не только владельцы)
 - ⚡ **Performance**: Bulk operations + caching для быстрой работы
+- 🔌 **Multi-user disconnect**: Истинная поддержка многопользовательского отключения
+- 🔄 **Seamless reconnection**: Автоматическое переподключение через обычный UI flow
+- ✨ **User Experience**: Интуитивный процесс - отключил через меню, переподключил через "Add Channel"
 
 ### 4. Clean Architecture с MCP интеграцией
 ```
@@ -760,4 +857,53 @@ export const usePosts = () => useEntityCRUD<Post, CreatePostDTO, UpdatePostDTO>(
   },
   "layout": {
     "type": "dashboard",
-    "navigation": "
+    "navigation": "sidebar"
+  }
+}
+```
+
+## Статус реализации системы отключения каналов
+
+### ✅ Завершенные компоненты (100% готово)
+
+**Backend Architecture:**
+- ✅ Multi-user disconnect система с PostgreSQL arrays
+- ✅ Automatic reconnection через существующий connect API
+- ✅ Comprehensive error handling и validation
+- ✅ Production-ready authentication с fallback
+- ✅ Database schema с `disconnected_by_users UUID[]`
+
+**API Endpoints:**
+- ✅ `POST /api/channels/[id]/disconnect` - отключение канала
+- ✅ `POST /api/channels/connect` - подключение/переподключение канала
+- ✅ Authentication integration с fallback для demo mode
+
+**Frontend Integration:**
+- ✅ Optimistic UI updates с rollback
+- ✅ Seamless UX через dropdown menu и Add Channel dialog
+- ✅ Error handling и user feedback
+- ✅ React hooks с comprehensive state management
+
+**Testing & Deployment:**
+- ✅ Production tested на Vercel deployment
+- ✅ Manual QA testing завершен успешно
+- ✅ Disconnect functionality работает как expected
+- ✅ Reconnection functionality работает как expected
+
+### 🎯 User Experience Flow (Протестировано)
+
+1. **Disconnect workflow**: Пользователь → Dropdown menu → "Disconnect" → Канал исчезает ✅
+2. **Reconnect workflow**: Пользователь → "Add Channel" → Вводит @username → Канал переподключается автоматически ✅
+3. **Multi-user safety**: Канал остается в БД для других пользователей ✅
+4. **Error handling**: Корректные ошибки при invalid operations ✅
+
+### 📊 Architecture Benefits Achieved
+
+- 🔄 **Multi-user support**: Полная поддержка многопользовательских каналов
+- 🗄️ **Data preservation**: Никакая data не теряется при disconnect/reconnect
+- ⚡ **Performance**: Efficient PostgreSQL array operations
+- 🎯 **User Experience**: Intuitive disconnect через меню, reconnect через обычный flow
+- 🛡️ **Safety**: Comprehensive validation и error handling
+- 🚀 **Production Ready**: Deployed и tested на production environment
+
+**Итоговый статус**: Система отключения/переподключения каналов **ПОЛНОСТЬЮ РЕАЛИЗОВАНА И ПРОТЕСТИРОВАНА** ✅

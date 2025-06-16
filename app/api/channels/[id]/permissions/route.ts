@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getChannelPermissionsService } from '@/lib/services/channel-permissions-service';
 import { ChannelService } from '@/lib/services/channel-service';
+import { getUserIdFromRequest } from '@/lib/auth/api-helpers';
 
 interface RouteParams {
   params: {
@@ -13,8 +14,8 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    // Временно используем фиксированный user_id пока не настроена аутентификация
-    const user_id = '1'; // TODO: получить из session
+    // Получаем user_id из аутентифицированного запроса
+    const user_id = await getUserIdFromRequest(request);
 
     const permissionsService = getChannelPermissionsService();
     
@@ -56,8 +57,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    // Временно используем фиксированный user_id пока не настроена аутентификация
-    const user_id = '1'; // TODO: получить из session
+    // Получаем user_id из аутентифицированного запроса
+    const user_id = await getUserIdFromRequest(request);
 
     // Парсинг опций синхронизации
     const body = await request.json().catch(() => ({}));
@@ -106,8 +107,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    // Временно используем фиксированный user_id пока не настроена аутентификация
-    const user_id = '1'; // TODO: получить из session
+    // Получаем user_id из аутентифицированного запроса
+    const user_id = await getUserIdFromRequest(request);
 
     // Парсинг запроса проверки права
     const body = await request.json();
@@ -152,8 +153,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    // Временно используем фиксированный user_id пока не настроена аутентификация
-    const user_id = '1'; // TODO: получить из session
+    // Получаем user_id из аутентифицированного запроса
+    const user_id = await getUserIdFromRequest(request);
 
     // Проверка окружения - только в development
     if (process.env.NODE_ENV === 'production') {
