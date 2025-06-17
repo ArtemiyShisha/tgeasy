@@ -116,7 +116,7 @@ export default function LoginPage() {
             isDark ? 'text-gray-400' : 'text-gray-500'
           }`}>
             <p>
-              Нажимая "Войти через Telegram", вы соглашаетесь с{' '}
+              Нажимая &quot;Войти через Telegram&quot;, вы соглашаетесь с{' '}
               <a href="/terms" className="text-blue-500 hover:text-blue-600 underline">
                 условиями использования
               </a>{' '}

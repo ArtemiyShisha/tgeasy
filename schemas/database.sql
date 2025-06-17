@@ -69,6 +69,13 @@ CREATE TYPE telegram_user_status AS ENUM (
   'administrator'   -- Администратор канала
 );
 
+-- Статус бота в канале
+CREATE TYPE bot_status AS ENUM (
+  'active',         -- Бот активен и имеет права
+  'pending_bot',    -- Бот ещё не добавлен в канал
+  'bot_missing'     -- Бот был удален или потерял права
+);
+
 -- Статусы платежей
 CREATE TYPE payment_status AS ENUM (
   'pending',    -- Ожидает оплаты
@@ -170,6 +177,13 @@ CREATE TABLE telegram_channels (
   is_active BOOLEAN NOT NULL DEFAULT true,
   last_checked_at TIMESTAMPTZ,
   error_message TEXT, -- Последняя ошибка при проверке канала
+  
+  -- Статус бота в канале
+  bot_status bot_status DEFAULT 'pending_bot',
+  bot_last_checked_at TIMESTAMPTZ,
+  
+  -- Support for multi-user disconnect
+  disconnected_by_users UUID[] DEFAULT '{}',
   
   -- Метаданные
   created_at TIMESTAMPTZ DEFAULT NOW(),

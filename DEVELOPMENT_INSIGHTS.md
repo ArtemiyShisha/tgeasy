@@ -1518,3 +1518,98 @@ const filteredChannels = useMemo(() => {
 ---
 
 **🎉 СТАТУС: Этап 3 успешно завершен! Готовы к следующему этапу.** 
+
+## ✅ Последние insights (Декабрь 2024)
+
+### 🎨 UX Redesign: Channel Status Unification
+
+**Problem Discovery**: При тестировании обнаружилось, что дублирование "статуса канала" и "статуса бота" создавало путаницу для пользователей.
+
+**Key Insight**: **Статус канала = статус бота** с точки зрения готовности к работе:
+- Пользователю важно понимать готовность канала к публикации
+- Технические детали про бота должны быть абстрагированы
+
+**Architectural Decision**:
+```typescript
+// Было: два отдельных статуса
+interface Channel {
+  status: 'connected' | 'disconnected'  // channel status  
+  bot_status: 'active' | 'pending' | 'missing'  // bot status
+}
+
+// Стало: единый статус готовности
+interface Channel {
+  bot_status: 'active' | 'pending_bot' | 'bot_missing'  // channel readiness
+}
+```
+
+**UX Benefits**:
+- Убрана путаница между статусами
+- Права пользователя показываются только когда имеют смысл
+- Четкие инструкции для каждого состояния
+
+### 🔐 API Authentication Consistency Lesson
+
+**Problem**: Endpoint `POST /api/channels/[id]/check-status` возвращал 401 ошибку.
+
+**Root Cause**: Использование разных подходов к аутентификации:
+```typescript
+// ❌ Problematic: Direct Supabase auth  
+const { data: { user } } = await supabase.auth.getUser()
+
+// ✅ Solution: Consistent helper
+const userId = await getUserIdFromRequest(request)
+```
+
+**Lesson Learned**: Консистентность в authentication patterns критически важна для API endpoints. Всегда использовать одни и те же helpers.
+
+**Applied Pattern**:
+```typescript
+// Standard authentication pattern for all API endpoints
+export async function POST(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const userId = await getUserIdFromRequest(request)
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    // ... endpoint logic
+  } catch (error) {
+    // ... error handling
+  }
+}
+```
+
+### 🏗️ Component Refactoring Strategy
+
+**Strategy Used**: Backwards-compatible refactoring с utility functions:
+
+```typescript
+// Old API (deprecated but working)
+export { ChannelStatusBadge as BotStatusBadge }
+export { isChannelOperational as isBotActive }
+
+// New API (recommended)
+export { ChannelStatusBadge }
+export { isChannelOperational, isChannelNeedsSetup }
+```
+
+**Benefits**:
+- Существующий код продолжает работать
+- Новый код использует лучшие naming conventions
+- Плавный переход без breaking changes
+
+### 🎯 Production Testing Insights
+
+**Discovery**: Тестирование на production deployment выявило проблемы, которые не было видно в development.
+
+**Key Learning**: 
+- Authentication middleware может работать по-разному в production
+- Environment variables могут вести себя иначе
+- Network timeouts могут отличаться
+
+**Best Practice Established**:
+1. Всегда тестировать critical paths на production-like environment
+2. Использовать consistent patterns для authentication
+3. Иметь fallback mechanisms для API calls
+
+--- 

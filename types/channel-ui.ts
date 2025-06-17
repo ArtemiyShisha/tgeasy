@@ -1,4 +1,5 @@
 import { Tables } from './database';
+import { BotStatus } from './channel';
 
 // Type aliases for better readability
 export type Channel = Tables<'telegram_channels'>;

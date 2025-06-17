@@ -2,7 +2,9 @@ import {
   ChannelConnectionRequest, 
   ChannelConnectionResponse,
   ChannelConnectionErrorCode,
-  ChannelFilters
+  ChannelFilters,
+  BotStatus,
+  BotStatusCheckResult
 } from '@/types/channel'
 import { ChannelRepository } from '@/lib/repositories/channel-repository'
 import { TelegramBotAPI } from '@/lib/integrations/telegram/bot-api'
@@ -283,6 +285,110 @@ export class ChannelService {
         error: error instanceof Error ? error.message : 'Неизвестная ошибка',
         error_code: ChannelConnectionErrorCode.VALIDATION_ERROR,
         status: 500
+      }
+    }
+  }
+
+  /**
+   * Проверка статуса бота в канале
+   * 
+   * Определяет, добавлен ли бот в канал и имеет ли он необходимые права
+   */
+  async checkBotStatus(channelId: string, userId: string): Promise<BotStatusCheckResult> {
+    try {
+      // 1. Получаем канал и проверяем права пользователя
+      const channel = await this.channelRepository.getById(channelId)
+      if (!channel) {
+        return {
+          success: false,
+          bot_status: 'bot_missing',
+          error: 'Канал не найден',
+          checked_at: new Date().toISOString()
+        }
+      }
+
+      // 2. Проверяем доступ пользователя к каналу
+      const userChannelsResult = await this.channelRepository.getUserChannels(userId)
+      const hasAccess = userChannelsResult.channels.some(ch => ch.id === channelId)
+      
+      if (!hasAccess) {
+        return {
+          success: false,
+          bot_status: 'bot_missing',
+          error: 'У вас нет доступа к этому каналу',
+          checked_at: new Date().toISOString()
+        }
+      }
+
+      // 3. Получаем информацию о боте
+      const botInfo = await this.telegramApi.getMe()
+      
+      // 4. Проверяем статус бота в канале
+      try {
+        const botMember = await this.telegramApi.getChatMember(
+          channel.telegram_channel_id,
+          botInfo.id
+        )
+
+        // Проверяем, что бот имеет права администратора
+        const isAdmin = botMember.status === 'administrator' || botMember.status === 'creator'
+        const canPost = botMember.can_post_messages || false
+
+        let botStatus: BotStatus
+        if (isAdmin && canPost) {
+          botStatus = 'active'
+        } else if (isAdmin) {
+          // Бот админ, но не может постить - все равно считаем активным
+          botStatus = 'active'
+        } else {
+          // Бот есть, но не админ
+          botStatus = 'pending_bot'
+        }
+
+        // 5. Обновляем статус в БД
+        await this.channelRepository.update(channelId, {
+          bot_status: botStatus,
+          bot_last_checked_at: new Date().toISOString()
+        })
+
+        return {
+          success: true,
+          bot_status: botStatus,
+          bot_permissions: botMember,
+          checked_at: new Date().toISOString()
+        }
+
+      } catch (telegramError) {
+        console.log('Bot not found in channel or no access:', telegramError)
+        
+        // Определяем статус: если канал новый - pending_bot, если старый - bot_missing
+        const isNewChannel = !channel.bot_last_checked_at
+        const botStatus = isNewChannel ? 'pending_bot' : 'bot_missing'
+
+        // Обновляем статус в БД
+        await this.channelRepository.update(channelId, {
+          bot_status: botStatus,
+          bot_last_checked_at: new Date().toISOString()
+        })
+
+        return {
+          success: true,
+          bot_status: botStatus,
+          error: isNewChannel 
+            ? 'Бот ещё не добавлен в канал' 
+            : 'Бот был удален из канала или потерял права',
+          checked_at: new Date().toISOString()
+        }
+      }
+
+    } catch (error) {
+      console.error('Error checking bot status:', error)
+      
+      return {
+        success: false,
+        bot_status: 'bot_missing',
+        error: error instanceof Error ? error.message : 'Ошибка при проверке статуса бота',
+        checked_at: new Date().toISOString()
       }
     }
   }

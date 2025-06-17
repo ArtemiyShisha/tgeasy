@@ -33,35 +33,24 @@ import {
 // Import existing hooks and types
 import { useChannels } from '@/hooks/use-channels';
 import { ChannelWithPermissions } from '@/types/channel-ui';
-
-// Simple Status Indicator Component
-const StatusIndicator = ({ channel }: { channel: ChannelWithPermissions }) => {
-  if (!channel.is_active) {
-    return (
-      <div className="flex items-center gap-2 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-        <WifiOff className="w-3 h-3" />
-        Disconnected
-      </div>
-    );
-  }
-  
-  return (
-    <div className="flex items-center gap-2 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-600">
-      <CheckCircle className="w-3 h-3" />
-      Active
-    </div>
-  );
-};
+import { 
+  ChannelStatusBadge, 
+  getChannelStatusDescription, 
+  isChannelOperational,
+  isChannelNeedsSetup 
+} from '@/components/channels/bot-status-badge';
 
 // Simple Channel Card Component
 const ChannelCard = ({ 
   channel, 
   onConnect, 
-  onDisconnect 
+  onDisconnect,
+  onCheckBotStatus 
 }: { 
   channel: ChannelWithPermissions; 
   onConnect: (id: string) => void;
   onDisconnect: (id: string) => void;
+  onCheckBotStatus: (id: string) => void;
 }) => {
   const formatLastActivity = (date: Date | string | null) => {
     if (!date) return 'No activity';
@@ -107,6 +96,10 @@ const ChannelCard = ({
                 <Eye className="w-4 h-4 mr-2" />
                 View Details
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onCheckBotStatus(channel.id)}>
+                <Activity className="w-4 h-4 mr-2" />
+                Проверить статус
+              </DropdownMenuItem>
               <DropdownMenuItem>
                 <Settings className="w-4 h-4 mr-2" />
                 Configure
@@ -134,31 +127,58 @@ const ChannelCard = ({
           </div>
         </div>
 
-        <StatusIndicator channel={channel} />
-
         <div className="space-y-2">
-          <div className="text-xs font-medium text-muted-foreground">Permissions</div>
-          <div className="flex flex-wrap gap-1">
-            {channel.isCreator && (
-              <Badge className="text-xs bg-yellow-100 text-yellow-800 border-yellow-200">
-                <Crown className="w-3 h-3 mr-1" />
-                Creator
-              </Badge>
-            )}
-            {channel.isAdministrator && (
-              <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200">
-                <Shield className="w-3 h-3 mr-1" />
-                Admin
-              </Badge>
-            )}
-            {channel.canPost && (
-              <Badge className="text-xs bg-green-100 text-green-800 border-green-200">
-                <Send className="w-3 h-3 mr-1" />
-                Post
-              </Badge>
-            )}
-          </div>
+          <div className="text-xs font-medium text-muted-foreground">Статус канала</div>
+          <ChannelStatusBadge 
+            botStatus={channel.bot_status} 
+            lastCheckedAt={channel.bot_last_checked_at}
+            className="text-xs"
+          />
         </div>
+
+        {/* Показываем права только когда канал активен и бот может их проверить */}
+        {isChannelOperational(channel.bot_status) && (
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-muted-foreground">Ваши права</div>
+            <div className="flex flex-wrap gap-1">
+              {channel.isCreator && (
+                <Badge className="text-xs bg-yellow-100 text-yellow-800 border-yellow-200">
+                  <Crown className="w-3 h-3 mr-1" />
+                  Владелец
+                </Badge>
+              )}
+              {channel.isAdministrator && (
+                <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+                  <Shield className="w-3 h-3 mr-1" />
+                  Админ
+                </Badge>
+              )}
+              {channel.canPost && (
+                <Badge className="text-xs bg-green-100 text-green-800 border-green-200">
+                  <Send className="w-3 h-3 mr-1" />
+                  Публикация
+                </Badge>
+              )}
+              {!channel.isCreator && !channel.isAdministrator && !channel.canPost && (
+                <Badge variant="outline" className="text-xs">
+                  Ограниченный доступ
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Показываем инструкции по настройке, если канал требует настройки */}
+        {isChannelNeedsSetup(channel.bot_status) && (
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="text-xs font-medium text-yellow-800 mb-1">
+              Требуется настройка
+            </div>
+            <div className="text-xs text-yellow-700">
+              {getChannelStatusDescription(channel.bot_status)}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -255,6 +275,7 @@ export function ChannelManagementInterface() {
     refetch, 
     connectChannel, 
     disconnectChannel,
+    checkBotStatus,
     hasChannels
   } = useChannels({
     filters: {
@@ -292,6 +313,17 @@ export function ChannelManagementInterface() {
     } catch (error) {
       console.error('Failed to disconnect channel:', error);
       // TODO: Добавить toast уведомление об ошибке 
+    }
+  };
+
+  const handleCheckBotStatus = async (channelId: string) => {
+    try {
+      await checkBotStatus(channelId);
+      // TODO: Добавить toast уведомление с результатом проверки
+      console.log('Bot status checked successfully');
+    } catch (error) {
+      console.error('Failed to check bot status:', error);
+      // TODO: Добавить toast уведомление об ошибке
     }
   };
 
@@ -414,6 +446,7 @@ export function ChannelManagementInterface() {
                   channel={channel}
                   onConnect={handleConnect}
                   onDisconnect={handleDisconnect}
+                  onCheckBotStatus={handleCheckBotStatus}
                 />
               ))
             ) : (
@@ -434,16 +467,16 @@ export function ChannelManagementInterface() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Channel</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Permissions</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>Канал</TableHead>
+                  <TableHead>Статус</TableHead>
+                  <TableHead>Права доступа</TableHead>
+                  <TableHead>Действия</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8">
+                    <TableCell colSpan={5} className="text-center py-8">
                       <Activity className="w-8 h-8 animate-spin mx-auto mb-2" />
                       <p>Loading channels...</p>
                     </TableCell>
@@ -465,15 +498,29 @@ export function ChannelManagementInterface() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <StatusIndicator channel={channel} />
+                        <ChannelStatusBadge 
+                          botStatus={channel.bot_status} 
+                          lastCheckedAt={channel.bot_last_checked_at}
+                        />
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
-                        {channel.isCreator && <Crown className="w-4 h-4 text-yellow-500" />}
-                        {channel.isAdministrator && <Shield className="w-4 h-4 text-blue-500" />}
-                        {channel.canPost && <Send className="w-4 h-4 text-green-500" />}
-                      </div>
-                    </TableCell>
+                        {/* Показываем права только если канал активен */}
+                        {isChannelOperational(channel.bot_status) ? (
+                          <div className="flex gap-1">
+                            {channel.isCreator && <Crown className="w-4 h-4 text-yellow-500" />}
+                            {channel.isAdministrator && <Shield className="w-4 h-4 text-blue-500" />}
+                            {channel.canPost && <Send className="w-4 h-4 text-green-500" />}
+                            {!channel.isCreator && !channel.isAdministrator && !channel.canPost && (
+                              <span className="text-xs text-muted-foreground">Ограниченный доступ</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {isChannelNeedsSetup(channel.bot_status) ? 'Настройте бота' : 'Недоступно'}
+                          </span>
+                        )}
+                      </TableCell>
+                      
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -485,6 +532,10 @@ export function ChannelManagementInterface() {
                           <DropdownMenuItem>
                             <Eye className="w-4 h-4 mr-2" />
                             View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleCheckBotStatus(channel.id)}>
+                            <Activity className="w-4 h-4 mr-2" />
+                            Проверить статус
                           </DropdownMenuItem>
                           <DropdownMenuItem>
                             <Settings className="w-4 h-4 mr-2" />
@@ -508,7 +559,7 @@ export function ChannelManagementInterface() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8">
+                    <TableCell colSpan={5} className="text-center py-8">
                       <Hash className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                       <h3 className="text-lg font-semibold mb-2">No channels found</h3>
                       <p className="text-muted-foreground mb-4">

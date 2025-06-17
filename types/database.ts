@@ -57,11 +57,11 @@ export type Database = {
       }
       channel_permissions: {
         Row: {
-          can_change_info: boolean | null
-          can_delete_messages: boolean | null
-          can_edit_messages: boolean | null
-          can_invite_users: boolean | null
-          can_post_messages: boolean | null
+          can_change_info: boolean
+          can_delete_messages: boolean
+          can_edit_messages: boolean
+          can_invite_users: boolean
+          can_post_messages: boolean
           channel_id: string
           created_at: string | null
           id: string
@@ -72,11 +72,11 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          can_change_info?: boolean | null
-          can_delete_messages?: boolean | null
-          can_edit_messages?: boolean | null
-          can_invite_users?: boolean | null
-          can_post_messages?: boolean | null
+          can_change_info?: boolean
+          can_delete_messages?: boolean
+          can_edit_messages?: boolean
+          can_invite_users?: boolean
+          can_post_messages?: boolean
           channel_id: string
           created_at?: string | null
           id?: string
@@ -87,11 +87,11 @@ export type Database = {
           user_id: string
         }
         Update: {
-          can_change_info?: boolean | null
-          can_delete_messages?: boolean | null
-          can_edit_messages?: boolean | null
-          can_invite_users?: boolean | null
-          can_post_messages?: boolean | null
+          can_change_info?: boolean
+          can_delete_messages?: boolean
+          can_edit_messages?: boolean
+          can_invite_users?: boolean
+          can_post_messages?: boolean
           channel_id?: string
           created_at?: string | null
           id?: string
@@ -106,21 +106,7 @@ export type Database = {
             foreignKeyName: "channel_permissions_channel_id_fkey"
             columns: ["channel_id"]
             isOneToOne: false
-            referencedRelation: "channel_statistics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "channel_permissions_channel_id_fkey"
-            columns: ["channel_id"]
-            isOneToOne: false
             referencedRelation: "telegram_channels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "channel_permissions_granted_by_fkey"
-            columns: ["granted_by"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
@@ -606,13 +592,6 @@ export type Database = {
             foreignKeyName: "posts_channel_id_fkey"
             columns: ["channel_id"]
             isOneToOne: false
-            referencedRelation: "channel_statistics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "posts_channel_id_fkey"
-            columns: ["channel_id"]
-            isOneToOne: false
             referencedRelation: "telegram_channels"
             referencedColumns: ["id"]
           },
@@ -690,6 +669,8 @@ export type Database = {
       }
       telegram_channels: {
         Row: {
+          bot_last_checked_at: string | null
+          bot_status: Database["public"]["Enums"]["bot_status"] | null
           channel_title: string
           channel_username: string | null
           created_at: string | null
@@ -703,6 +684,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          bot_last_checked_at?: string | null
+          bot_status?: Database["public"]["Enums"]["bot_status"] | null
           channel_title: string
           channel_username?: string | null
           created_at?: string | null
@@ -716,6 +699,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          bot_last_checked_at?: string | null
+          bot_status?: Database["public"]["Enums"]["bot_status"] | null
           channel_title?: string
           channel_username?: string | null
           created_at?: string | null
@@ -862,29 +847,6 @@ export type Database = {
           },
         ]
       }
-      channel_statistics: {
-        Row: {
-          avg_ctr: number | null
-          channel_title: string | null
-          channel_username: string | null
-          id: string | null
-          is_active: boolean | null
-          published_posts: number | null
-          total_clicks: number | null
-          total_posts: number | null
-          total_views: number | null
-          user_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "telegram_channels_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       posts_with_analytics: {
         Row: {
           advertiser_inn: string | null
@@ -912,13 +874,6 @@ export type Database = {
           views: number | null
         }
         Relationships: [
-          {
-            foreignKeyName: "posts_channel_id_fkey"
-            columns: ["channel_id"]
-            isOneToOne: false
-            referencedRelation: "channel_statistics"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "posts_channel_id_fkey"
             columns: ["channel_id"]
@@ -991,6 +946,7 @@ export type Database = {
       }
     }
     Enums: {
+      bot_status: "active" | "pending_bot" | "bot_missing"
       notification_type:
         | "post_created"
         | "post_published"
@@ -1125,6 +1081,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      bot_status: ["active", "pending_bot", "bot_missing"],
       notification_type: [
         "post_created",
         "post_published",

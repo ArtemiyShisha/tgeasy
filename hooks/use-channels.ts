@@ -8,6 +8,7 @@ import {
   UseChannelsOptions,
   ChannelConnectionResponse
 } from '@/types/channel-ui';
+import { BotStatusCheckResult } from '@/types/channel';
 import { 
   applyChannelFilters, 
   filterChannelsByPermissions,
@@ -38,6 +39,7 @@ interface UseChannelsReturn {
   connectChannel: (usernameOrLink: string) => Promise<ChannelConnectionResponse>;
   updateChannel: (channelId: string, updates: any) => Promise<ChannelWithPermissions>;
   disconnectChannel: (channelId: string) => Promise<void>;
+  checkBotStatus: (channelId: string) => Promise<BotStatusCheckResult>;
   
   // Permission-based filtering
   filterByPermissions: (permission: string) => ChannelWithPermissions[];
@@ -248,6 +250,50 @@ export function useChannels(options: UseChannelsOptions = {}): UseChannelsReturn
     }
   }, [channels]);
 
+  // Check bot status
+  const checkBotStatus = useCallback(async (channelId: string): Promise<BotStatusCheckResult> => {
+    if (!channelId) {
+      throw new Error('Channel ID is required');
+    }
+
+    try {
+      const response = await fetch(`/api/channels/${channelId}/check-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to check bot status');
+      }
+
+      const result = await response.json();
+      
+      // Обновляем локальное состояние каналов с новым статусом бота
+      setChannels(prev => prev.map(channel => 
+        channel.id === channelId 
+          ? { 
+              ...channel, 
+              bot_status: result.bot_status,
+              bot_last_checked_at: result.checked_at
+            }
+          : channel
+      ));
+
+      return {
+        success: result.success,
+        bot_status: result.bot_status,
+        bot_permissions: result.bot_permissions,
+        checked_at: result.checked_at,
+        error: result.message
+      };
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('Unknown error');
+    }
+  }, []);
+
   // Apply optimistic updates to channels
   const channelsWithOptimisticUpdates = useMemo(() => {
     return channels.map(channel => {
@@ -317,6 +363,7 @@ export function useChannels(options: UseChannelsOptions = {}): UseChannelsReturn
     connectChannel,
     updateChannel,
     disconnectChannel,
+    checkBotStatus,
     
     // Permission-based filtering
     filterByPermissions,

@@ -1,4 +1,5 @@
 import { Database } from './database'
+
 import { TelegramChat, TelegramChatMember } from './telegram'
 import { ChannelPermission } from './channel-permissions'
 
@@ -59,6 +60,9 @@ export enum ChannelStatus {
   ERROR = 'error',
   PENDING = 'pending'
 }
+
+// Bot status in channel
+export type BotStatus = 'active' | 'pending_bot' | 'bot_missing';
 
 // Channel verification data
 export interface ChannelVerification {
@@ -154,9 +158,18 @@ export interface ChannelPermissionsResponse {
   sync_source: 'telegram_api' | 'webhook' | 'manual'
 }
 
+// Bot status check result
+export interface BotStatusCheckResult {
+  success: boolean
+  bot_status: BotStatus
+  bot_permissions?: TelegramChatMember
+  error?: string
+  checked_at: string
+}
+
 // WebSocket events for real-time updates
 export interface ChannelWebSocketEvent {
-  type: 'channel_updated' | 'permissions_changed' | 'status_changed' | 'stats_updated'
+  type: 'channel_updated' | 'permissions_changed' | 'status_changed' | 'stats_updated' | 'bot_status_changed'
   channel_id: string
   user_id: string
   data: any
