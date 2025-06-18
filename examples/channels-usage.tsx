@@ -8,9 +8,9 @@ import { useState } from 'react';
 import { 
   useChannels, 
   useChannelStatus, 
-  useChannelPermissions,
-  type ChannelFilters 
+  useChannelPermissions
 } from '@/hooks';
+import type { ChannelFilters } from '@/types/channel-ui';
 
 export default function ChannelsExample() {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);

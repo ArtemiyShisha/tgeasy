@@ -279,4 +279,5 @@ export interface ChannelSearchResult {
   per_page: number;
 }
 
-export default {}; 
+const telegramTypes = {};
+export default telegramTypes; 
