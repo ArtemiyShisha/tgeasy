@@ -58,7 +58,31 @@
 
 ## 2. Продуктовые цели
 
-### 2.1 Пользовательский опыт
+### 2.1 Дизайн-цели (Apple-Inspired System) ✨ НОВОЕ
+
+#### Professional Brand Positioning
+- **Цель**: TGeasy воспринимается как enterprise-ready решение
+- **Измерение**: Пользовательские интервью, brand perception surveys
+- **Критерий успеха**: 90% пользователей считают интерфейс "профессиональным" и "подходящим для бизнеса"
+
+#### Content-First User Experience
+- **Цель**: Пользователи фокусируются на контенте, а не на интерфейсе
+- **Принцип**: Apple Design - "deference" (interface отступает на второй план)
+- **Измерение**: Task completion rate, user attention heatmaps
+- **Критерий успеха**: 95% пользователей выполняют задачи без отвлечения на UI элементы
+
+#### Visual Calm & Productivity
+- **Цель**: Снизить когнитивную нагрузку от интерфейса
+- **Подход**: Minimal color palette, subtle interactions, clean typography
+- **Измерение**: User stress levels, session duration quality
+- **Критерий успеха**: Пользователи работают дольше без усталости от интерфейса
+
+#### Accessibility & Readability
+- **Цель**: WCAG 2.1 AA compliance для всех пользователей
+- **Измерение**: Automated accessibility testing, colorblind user testing
+- **Критерий успеха**: 100% компонентов проходят accessibility audit
+
+### 2.2 Пользовательский опыт
 
 #### Time to Value
 - **Цель**: Пользователь создает первую кампанию за 15 минут
