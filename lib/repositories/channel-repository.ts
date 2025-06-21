@@ -102,56 +102,116 @@ export class ChannelRepository {
   /**
    * Получение каналов пользователя (упрощенная версия без прав)
    */
-  async getUserChannels(userId: string, filters: ChannelFilters = {}): Promise<{
-    channels: Channel[]
-    total: number
-  }> {
-    let query = this.supabase
+  async getUserChannels(userId: string, filters: ChannelFilters = {}): Promise<{ channels: Channel[]; total: number }> {
+    // 1. Каналы, где пользователь является владельцем (старое поведение)
+    let ownerQuery = this.supabase
       .from('telegram_channels')
-      .select('*', { count: 'exact' })
+      .select('*')
       .eq('user_id', userId)
       .eq('is_active', true)
       .not('disconnected_by_users', 'cs', `{${userId}}`)
 
-    // Apply filters
+    // 2. Каналы, где у пользователя есть права в channel_permissions
+    const { data: permRows, error: permError } = await this.supabase
+      .from('channel_permissions')
+      .select('channel_id')
+      .eq('user_id', userId)
+
+    if (permError) {
+      throw new Error(`Failed to fetch channel permissions: ${permError.message}`)
+    }
+
+    const permissionChannelIds: string[] = (permRows || []).map((row: any) => row.channel_id)
+
+    let permChannels: Channel[] = []
+    if (permissionChannelIds.length > 0) {
+      let permQuery = this.supabase
+        .from('telegram_channels')
+        .select('*')
+        .in('id', permissionChannelIds)
+        .eq('is_active', true)
+        .not('disconnected_by_users', 'cs', `{${userId}}`)
+
+      // Применяем те же фильтры
+      if (filters.status && filters.status.length > 0) {
+        if (filters.status.includes('active')) {
+          permQuery = permQuery.eq('is_active', true)
+        } else if (filters.status.includes('inactive')) {
+          permQuery = permQuery.eq('is_active', false)
+        }
+      }
+
+      if (filters.search) {
+        permQuery = permQuery.or(`channel_title.ilike.%${filters.search}%,channel_username.ilike.%${filters.search}%`)
+      }
+
+      if (filters.created_after) {
+        permQuery = permQuery.gte('created_at', filters.created_after)
+      }
+
+      if (filters.created_before) {
+        permQuery = permQuery.lte('created_at', filters.created_before)
+      }
+
+      const { data: permData, error: permDataErr } = await permQuery
+
+      if (permDataErr) {
+        throw new Error(`Failed to fetch permission channels: ${permDataErr.message}`)
+      }
+
+      permChannels = permData || []
+    }
+
+    // Применяем фильтры к ownerQuery
     if (filters.status && filters.status.length > 0) {
       if (filters.status.includes('active')) {
-        query = query.eq('is_active', true)
+        ownerQuery = ownerQuery.eq('is_active', true)
       } else if (filters.status.includes('inactive')) {
-        query = query.eq('is_active', false)
+        ownerQuery = ownerQuery.eq('is_active', false)
       }
     }
 
     if (filters.search) {
-      query = query.or(`channel_title.ilike.%${filters.search}%,channel_username.ilike.%${filters.search}%`)
+      ownerQuery = ownerQuery.or(`channel_title.ilike.%${filters.search}%,channel_username.ilike.%${filters.search}%`)
     }
 
     if (filters.created_after) {
-      query = query.gte('created_at', filters.created_after)
+      ownerQuery = ownerQuery.gte('created_at', filters.created_after)
     }
 
     if (filters.created_before) {
-      query = query.lte('created_at', filters.created_before)
+      ownerQuery = ownerQuery.lte('created_at', filters.created_before)
     }
 
-    // Pagination
+    // Выполняем основной запрос владельца (с пагинацией в конце)
+    // Pagination only applies after merge to simplify logic
+    const { data: ownerData, error: ownerError } = await ownerQuery
+
+    if (ownerError) {
+      throw new Error(`Failed to fetch owner channels: ${ownerError.message}`)
+    }
+
+    const merged = new Map<string, Channel>()
+    ;[...(ownerData || []), ...permChannels].forEach(ch => merged.set(ch.id, ch))
+
+    let channelsArray = Array.from(merged.values())
+
+    // Сортировка по дате создания (по умолчанию – новые выше)
+    channelsArray = channelsArray.sort((a, b) => {
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : 0
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : 0
+      return bDate - aDate
+    })
+
+    // Pagination manual
     const page = filters.page || 1
     const limit = filters.limit || 20
     const offset = (page - 1) * limit
-
-    query = query
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
-
-    const { data, error, count } = await query
-
-    if (error) {
-      throw new Error(`Failed to get user channels: ${error.message}`)
-    }
+    const paginated = channelsArray.slice(offset, offset + limit)
 
     return {
-      channels: data || [],
-      total: count || 0
+      channels: paginated,
+      total: channelsArray.length
     }
   }
 

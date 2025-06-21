@@ -1,2 +1,4 @@
-// This file is intentionally left blank for now.
-// It will be used for shared TypeScript types across the application. 
+// types/index.ts
+export * from './contract';
+export * from './contract-ui';
+export * from './database'; 

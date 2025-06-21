@@ -227,33 +227,35 @@ const stats = {
 
 ## Supabase MCP интеграция
 
-**⚠️ ВАЖНО**: В этом проекте **НЕТ локального Supabase**! Все взаимодействие с базой данных происходит через **Supabase MCP интеграцию**.
+**⚠️ ВАЖНО**: В этом проекте **НЕТ локального Supabase**! Все взаимодействие с базой данных происходит двумя способами:
+- **Production код** использует **Supabase JavaScript Client**
+- **Разработка** использует **Supabase MCP интеграцию** для AI-ассистента
 
-### Архитектура данных через MCP
+### Архитектура данных
 ```
 ┌─────────────────────────────────────────┐
 │        Frontend (Next.js)              │
-│   ├── lib/supabase/client.ts           │
-│   └── lib/supabase/server.ts           │
+│   ├── lib/supabase/client.ts           │ ← Production: Supabase JS Client
+│   └── lib/supabase/server.ts           │ ← Production: Supabase JS Client
 ├─────────────────────────────────────────┤
-│        MCP Integration Layer            │
-│   ├── mcp_supabase_* functions         │
-│   ├── Remote Supabase instance         │
-│   └── schemas/database.sql (local)     │
+│     Development Tools Layer            │
+│   ├── mcp_supabase_* functions         │ ← Development: AI-assistant tools
+│   ├── Cursor MCP integration           │ ← Development: Code generation
+│   └── schemas/database.sql (local)     │ ← Development: Schema reference
 ├─────────────────────────────────────────┤
 │        Supabase Cloud                   │
-│   ├── PostgreSQL Database              │
-│   ├── Authentication                   │
-│   ├── Storage                          │
-│   └── Edge Functions                   │
+│   ├── PostgreSQL Database              │ ← Production: Real database
+│   ├── Authentication                   │ ← Production: User auth
+│   ├── Storage                          │ ← Production: File storage
+│   └── Edge Functions                   │ ← Production: Serverless functions
 └─────────────────────────────────────────┘
 ```
 
 ### Что ЕСТЬ в проекте:
 - ✅ `schemas/database.sql` - полная схема БД
-- ✅ `lib/supabase/` - клиенты для подключения
+- ✅ `lib/supabase/` - Supabase JS клиенты для production
 - ✅ `types/database.ts` - TypeScript типы
-- ✅ MCP функции для работы с БД
+- ✅ MCP функции для AI-ассистированной разработки
 
 ### Что НЕТ в проекте:
 - ❌ `supabase/` папка с конфигурацией
@@ -262,10 +264,16 @@ const stats = {
 - ❌ Docker контейнер с PostgreSQL
 
 ### Рабочий процесс с БД:
+**Для разработки (через AI-ассистента)**:
 1. **Просмотр схемы**: читать `schemas/database.sql`
 2. **Создание таблиц**: `mcp_supabase_apply_migration`
 3. **Выполнение SQL**: `mcp_supabase_execute_sql`
 4. **Генерация типов**: `mcp_supabase_generate_typescript_types`
+
+**Для production кода**:
+1. **Подключение**: `createClient()` из `lib/supabase/server.ts`
+2. **Запросы**: `supabase.from('table').select()` и т.д.
+3. **Типизация**: импорт из `types/database.ts`
 
 ## AI-First технологическая архитектура
 
@@ -1050,3 +1058,82 @@ spacing: 0.5rem, 1rem, 1.5rem, 2rem, 3rem, 4rem, 6rem
 - ✅ **Performance Focus**: Оптимизация bundle size и loading times
 
 **Заключение**: Переход на **HorizonUI-driven development** обеспечивает **stable foundation** для долгосрочного развития TGeasy с focus на качество и производительность вместо скорости автогенерации.
+
+## Соответствие требованиям ОРД (Операторы Рекламных Данных)
+
+### Текущий статус соответствия
+- ✅ Базовое управление договорами и рекламодателями
+- ❌ Интеграция с ОРД для получения токенов (ERID)
+- ❌ Передача данных в ЕРИР
+- ❌ Система отчетности по рекламным кампаниям
+
+### План доработки для полного соответствия:
+
+#### Этап 1: Расширение модели данных
+1. **Договоры:**
+   - Добавить тип договора (самореклама/агентство/прямой)
+   - Добавить код ККТУ (Классификатор категорий товаров и услуг)
+   - Добавить информацию о площадках размещения
+   - Добавить связь с рекламными кампаниями
+
+2. **Рекламные кампании:**
+   - Создать модель Campaign с токенами ERID
+   - Отслеживание показов, кликов, бюджетов
+   - Связь с договорами и площадками
+
+#### Этап 2: Интеграция с ОРД
+1. **API интеграции:**
+   - VK ОРД (бесплатный)
+   - Яндекс ОРД (бесплатный) 
+   - МедиаСкаут (от 1000 руб/мес)
+   - Первый ОРД (от 5000 руб/мес)
+
+2. **Функции:**
+   - Регистрация рекламодателей в ОРД
+   - Получение токенов для креативов
+   - Автоматическая маркировка постов
+
+#### Этап 3: Система отчетности
+1. **Ежемесячные отчеты в ОРД**
+2. **Отслеживание статистики кампаний**
+3. **Автоматическая передача данных в ЕРИР**
+
+#### Этап 4: Автоматизация процессов
+1. **Автоматическая маркировка постов с токенами**
+2. **Уведомления о необходимости подачи отчетности**
+3. **Проверка соответствия требованиям законодательства**
+
+### Приоритетность задач:
+1. **Высокий приоритет:** Интеграция с бесплатными ОРД (VK, Яндекс)
+2. **Средний приоритет:** Расширение модели данных
+3. **Низкий приоритет:** Полная автоматизация процессов
+
+### 2025-02-10 — Incremental Architecture Update (v1.7.0)
+
+#### Multi-user Telegram Channels
+* **Shared ownership model**: один канал хранится в `telegram_channels`, а права каждого пользователя — в новой таблице `channel_permissions` (enum `creator`/`administrator` + флаги `can_post_messages`, …).
+* **Локальное скрытие канала**: массив `disconnected_by_users UUID[]` внутри `telegram_channels` позволяет пользователю «отвязать» канал только из своего интерфейса (can reconnect later).
+* **Endpoint flow**
+  ```text
+  POST /api/channels/connect      → создаёт или связывает канал, upsert в channel_permissions
+  POST /api/channels/[id]/disconnect → удаляет запись permission, добавляет user_id в disconnected_by_users
+  GET  /api/channels              → ChannelRepository.getUserChannels возвращает union(owned ∪ permissions) \ disconnected
+  ```
+
+#### Contracts – Безопасная выдача файлов
+* Все файлы хранятся в bucket `contracts` (Supabase Storage) путём `<user_id>/<slugified_fileName>`.
+* Публичные URL отключены → для доступа используется временный signed URL (1 час).
+  * **API**: `GET /api/contracts/{id}/download` генерирует ссылку через `fileUploadService.getSignedUrl()` и делает 302 redirect.
+* Frontend (`ContractCard`, `ContractTable`) вызывает `contractsApi.downloadContract`, который либо:
+  1. скачивает Blob и создаёт `blob:` URL для Preview/Download,
+  2. в будущем сможет открывать signed URL напрямую.
+
+#### Auth & Security Notes
+* Пока не настроен полноценный Supabase session через Telegram-callback, backend работает под **service-role**-клиентом, а идентификация выполняется по cookie `user_id` (see `getUserIdFromRequest`).  
+  RLS остаётся защищённой, т.к. операции выполняет service-role, но данные всегда фильтруются по `user_id` в SQL/коде.
+
+#### File-upload hardening
+* Имя файла нормализуется до ASCII-slug: `timestamp_rand_slug.ext` → устраняет ошибку «Invalid key» в Storage.
+* Телефонная валидация сервер-сайд: E.164 (11-15 цифр, optional +) — синхронизирована с клиентом.
+
+> Эти изменения не затрагивают общую DDD-структуру, но уточняют механизмы **Channels** и **Contracts** доменов. Добавленные таблицы/поля отражены в `schemas/database.sql` и миграциях cloud-БД.

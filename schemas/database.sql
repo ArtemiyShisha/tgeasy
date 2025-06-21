@@ -97,6 +97,23 @@ CREATE TYPE notification_type AS ENUM (
   'channel_error'      -- Ошибка канала
 );
 
+-- Contract types enum for ORD compliance
+CREATE TYPE contract_type AS ENUM ('self_advertising', 'agency', 'direct');
+
+-- OKVED categories enum for advertising classification
+CREATE TYPE okved_category AS ENUM (
+  '73.11', -- Рекламные агентства
+  '73.12', -- Представление рекламы в СМИ
+  '58.13', -- Издание журналов и периодических изданий
+  '58.14', -- Издание газет
+  '60.10', -- Деятельность в области радиовещания
+  '60.20', -- Деятельность в области телевизионного вещания
+  'other'  -- Другие виды деятельности
+);
+
+-- Contract currency enum
+CREATE TYPE contract_currency AS ENUM ('RUB', 'USD', 'EUR');
+
 -- ================================================================
 -- ОСНОВНЫЕ ТАБЛИЦЫ
 -- ================================================================
@@ -233,21 +250,35 @@ CREATE TABLE contracts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   
-  -- Информация о договоре
+  -- Basic contract information
   title VARCHAR(255) NOT NULL,
-  description TEXT,
-  
-  -- Рекламодатель
   advertiser_name VARCHAR(255) NOT NULL,
   advertiser_inn VARCHAR(12) NOT NULL,
-  advertiser_contact VARCHAR(255), -- Email или телефон
   
-  -- Файлы договора
-  file_path VARCHAR(500), -- Путь к файлу в Supabase Storage
+  -- ORD compliance fields
+  contract_type contract_type NOT NULL DEFAULT 'direct',
+  okved_category okved_category,
+  advertiser_legal_address TEXT,
+  advertiser_contact_person VARCHAR(255),
+  advertiser_phone VARCHAR(20),
+  advertiser_email VARCHAR(255),
+  
+  -- Contract details
+  contract_number VARCHAR(100),
+  contract_date DATE,
+  
+  -- File information
+  file_url TEXT,
   file_name VARCHAR(255),
   file_size INTEGER,
+  mime_type VARCHAR(100),
+  page_count INTEGER,
+  extracted_text TEXT,
+  thumbnail_url TEXT,
   
-  -- Метаданные
+  -- Status and lifecycle
+  status contract_status DEFAULT 'draft',
+  expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   
@@ -258,7 +289,7 @@ CREATE TABLE contracts (
 
 COMMENT ON TABLE contracts IS 'Договоры с рекламодателями';
 COMMENT ON COLUMN contracts.advertiser_inn IS 'ИНН рекламодателя (10 или 12 цифр)';
-COMMENT ON COLUMN contracts.file_path IS 'Путь к файлу договора в Supabase Storage';
+COMMENT ON COLUMN contracts.file_url IS 'URL файла договора';
 
 -- Рекламные размещения (упрощенная модель вместо campaigns + creatives)
 CREATE TABLE posts (
@@ -275,6 +306,10 @@ CREATE TABLE posts (
   creative_text TEXT NOT NULL,
   creative_images JSONB DEFAULT '[]', -- Массив URL изображений
   target_url TEXT, -- Ссылка на сайт рекламодателя
+  
+  -- Стоимость размещения (перенесено из contract)
+  placement_cost DECIMAL(12,2), -- Стоимость конкретного размещения
+  placement_currency contract_currency DEFAULT 'RUB', -- Валюта размещения
   
   -- ОРД информация (обязательная для публикации)
   advertiser_inn VARCHAR(12) NOT NULL,
@@ -1000,13 +1035,29 @@ VALUES (
 
 -- Тестовый договор
 INSERT INTO contracts (
-  user_id, title, advertiser_name, advertiser_inn, description
+  user_id, title, advertiser_name, advertiser_inn, contract_type, okved_category, advertiser_legal_address, advertiser_contact_person, advertiser_phone, advertiser_email, contract_number, contract_date, contract_amount, contract_currency, file_url, file_name, file_size, mime_type, page_count, extracted_text, thumbnail_url
 ) VALUES (
   '00000000-0000-0000-0000-000000000001',
   'Договор с Test Advertiser',
   'ООО Тестовый рекламодатель',
   '1234567890',
-  'Тестовый договор на размещение рекламы'
+  'direct',
+  'other',
+  '12345, Москва, ул. Ленина, д. 1',
+  'Иванов Иван Иванович',
+  '+7 (495) 123-45-67',
+  'ivanov@example.com',
+  '1234567890',
+  '2024-01-01',
+  10000.00,
+  'RUB',
+  'https://example.com/contract.pdf',
+  'Договор с Test Advertiser',
+  123456,
+  'application/pdf',
+  1,
+  'Тестовый договор на размещение рекламы',
+  'https://example.com/thumbnail.jpg'
 ) ON CONFLICT DO NOTHING;
 
 -- ================================================================

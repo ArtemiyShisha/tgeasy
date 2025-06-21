@@ -1,11 +1,16 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { Database } from '@/types/database'
 
 export function createClient() {
   const cookieStore = cookies()
+  const headersList = headers()
 
-  return createServerClient<Database>(
+  // Check for Authorization header with Bearer token
+  const authHeader = headersList.get('authorization')
+  const accessToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+
+  const client = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -34,4 +39,14 @@ export function createClient() {
       },
     }
   )
+
+  // If we have an access token from Authorization header, set it
+  if (accessToken) {
+    client.auth.setSession({
+      access_token: accessToken,
+      refresh_token: '', // We don't have refresh token from header
+    })
+  }
+
+  return client
 } 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { validateTelegramAuth, extractTelegramAuthData } from '@/utils/telegram-auth'
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,17 +100,58 @@ async function handleTelegramAuth(request: NextRequest, telegramData: any) {
     console.log('✅ User created successfully:', userId)
   }
 
-  // Устанавливаем сессию через cookies
+  // После создания/обновления пользователя --- добавляем Supabase Auth -----------------
+
+  // 1. Создаём/находим пользователя в Supabase Auth и выдаём сессию
+  try {
+    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+    const admin = createSupabaseAdmin(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false }
+    })
+
+    // Проверяем существование пользователя в Auth
+    let authUser = null as any
+    try {
+      const { data } = await admin.auth.admin.getUserById(userId)
+      authUser = data?.user || null
+    } catch {
+      authUser = null
+    }
+
+    if (!authUser) {
+      // Создаём нового Auth-пользователя с тем же UUID
+      const email = `${telegramData.id}@telegram.tgeasy`
+      await admin.auth.admin.createUser({
+        id: userId,
+        email,
+        email_confirm: true,
+        user_metadata: {
+          telegram_id: telegramData.id,
+          telegram_username: telegramData.username,
+          telegram_first_name: telegramData.first_name,
+          telegram_last_name: telegramData.last_name
+        }
+      })
+    }
+
+    // Пока Supabase Admin SDK не поддерживает createSession, пропускаем выдачу токенов
+
+  } catch (e) {
+    console.error('Supabase Auth integration error:', e)
+  }
+
+  // -------------------------------------------------------------------------------
+
+  // Старая cookie-сессия (оставляем для плавного перехода)
   const cookieStore = cookies()
-  
-  // Простая сессия через cookies (в production лучше использовать JWT)
   cookieStore.set('user_id', userId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 7 // 7 дней
   })
-  
   cookieStore.set('telegram_id', telegramData.id.toString(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

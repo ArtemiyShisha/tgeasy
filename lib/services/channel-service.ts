@@ -10,6 +10,7 @@ import { ChannelRepository } from '@/lib/repositories/channel-repository'
 import { TelegramBotAPI } from '@/lib/integrations/telegram/bot-api'
 import { validateChannelIdentifier, getChannelErrorMessage } from '@/utils/channel-validation'
 import { TelegramError } from '@/types/telegram'
+import { getChannelPermissionsRepository } from '@/lib/repositories/channel-permissions-repository'
 
 // Types for disconnect operation
 interface ChannelDisconnectResult {
@@ -23,6 +24,7 @@ export class ChannelService {
   private static instance: ChannelService
   private channelRepository: ChannelRepository
   private telegramApi: TelegramBotAPI
+  private permissionsRepo = getChannelPermissionsRepository()
 
   private constructor() {
     this.channelRepository = ChannelRepository.getInstance()
@@ -128,7 +130,36 @@ export class ChannelService {
         }
       }
 
-      // 5. Создание нового канала в БД
+      // 4.b Если канал найден у другого пользователя, добавляем права и возвращаем
+      const existingChannelForAnyUser = await this.channelRepository.getByTelegramId(chatInfo.id.toString())
+      if (existingChannelForAnyUser) {
+        console.log('➕ Linking existing shared channel to user via permissions')
+
+        // Upsert права доступа (по умолчанию считаем пользователя администратором)
+        await this.permissionsRepo.upsert({
+          channel_id: existingChannelForAnyUser.id,
+          user_id: request.user_id,
+          telegram_status: 'administrator',
+          can_post_messages: true,
+          can_edit_messages: true,
+          can_delete_messages: true,
+          can_change_info: true,
+          can_invite_users: true
+        })
+
+        // Убираем пользователя из списка отключенных, если он там был
+        await this.channelRepository.reconnectUserToChannel(existingChannelForAnyUser.id, request.user_id)
+
+        return {
+          success: true,
+          channel: existingChannelForAnyUser,
+          telegram_data: {
+            chat: chatInfo
+          }
+        }
+      }
+
+      // 5. Создание нового канала в БД (если он вообще нигде не существует)
       const channelData = {
         telegram_channel_id: chatInfo.id.toString(),
         channel_title: chatInfo.title || 'Без названия',
@@ -138,6 +169,18 @@ export class ChannelService {
       }
 
       const channel = await this.channelRepository.create(channelData)
+
+      // Создаем права для владельца (creator)
+      await this.permissionsRepo.upsert({
+        channel_id: channel.id,
+        user_id: request.user_id,
+        telegram_status: 'creator',
+        can_post_messages: true,
+        can_edit_messages: true,
+        can_delete_messages: true,
+        can_change_info: true,
+        can_invite_users: true
+      })
 
       return {
         success: true,
@@ -257,20 +300,14 @@ export class ChannelService {
         }
       }
 
-      // 3. В упрощенной системе удаляем связь пользователя с каналом
-      // Если в будущем будет система channel_permissions, то удалим оттуда
-      // Пока что в упрощенной системе проверяем user_id канала
-      if (channel.user_id !== userId) {
-        return {
-          success: false,
-          error: 'У вас нет прав на отключение этого канала',
-          error_code: ChannelConnectionErrorCode.ACCESS_DENIED,
-          status: 403
-        }
+      // 3. Удаляем права (если есть) и добавляем пользователя в disconnected_by_users
+      try {
+        await this.permissionsRepo.delete(userId, channelId)
+      } catch (permErr) {
+        console.warn('Failed to delete channel permission:', permErr)
       }
 
       // 4. Отключаем пользователя от канала (канал остается для других пользователей)
-      // Канал остается в БД, но пользователь его больше не видит
       await this.channelRepository.disconnectUserFromChannel(channelId, userId)
 
       return {
