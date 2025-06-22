@@ -3,16 +3,6 @@
 // Contract type for ORD (Operators of Advertising Data) compliance
 export type ContractType = 'self_advertising' | 'agency' | 'direct';
 
-// OKVED categories for advertising classification
-export type OKVEDCategory = 
-  | '73.11' // Рекламные агентства
-  | '73.12' // Представление рекламы в СМИ
-  | '58.13' // Издание журналов и периодических изданий
-  | '58.14' // Издание газет
-  | '60.10' // Деятельность в области радиовещания
-  | '60.20' // Деятельность в области телевизионного вещания
-  | 'other'; // Другие виды деятельности
-
 export interface Contract {
   id: string;
   user_id: string;
@@ -22,7 +12,6 @@ export interface Contract {
   
   // ORD compliance fields
   contract_type?: ContractType;
-  okved_category?: OKVEDCategory;
   advertiser_legal_address?: string;
   advertiser_contact_person?: string;
   advertiser_phone?: string;
@@ -59,7 +48,6 @@ export interface CreateContractDTO {
   advertiser_name: string;
   advertiser_inn: string;
   contract_type: ContractType;
-  okved_category?: OKVEDCategory;
   advertiser_legal_address?: string;
   advertiser_contact_person?: string;
   advertiser_phone?: string;
@@ -74,7 +62,6 @@ export interface UpdateContractDTO {
   advertiser_name?: string;
   advertiser_inn?: string;
   contract_type?: ContractType;
-  okved_category?: OKVEDCategory;
   advertiser_legal_address?: string;
   advertiser_contact_person?: string;
   advertiser_phone?: string;
@@ -223,17 +210,6 @@ export const CONTRACT_TYPE_DESCRIPTIONS: Record<ContractType, string> = {
   'self_advertising': 'Реклама собственных товаров и услуг на собственных площадках',
   'agency': 'Работа через рекламное агентство или посредника',
   'direct': 'Прямые отношения между рекламодателем и рекламораспространителем'
-};
-
-// OKVED category labels for UI
-export const OKVED_CATEGORY_LABELS: Record<OKVEDCategory, string> = {
-  '73.11': '73.11 - Рекламные агентства',
-  '73.12': '73.12 - Представление рекламы в СМИ',
-  '58.13': '58.13 - Издание журналов и периодических изданий',
-  '58.14': '58.14 - Издание газет',
-  '60.10': '60.10 - Деятельность в области радиовещания',
-  '60.20': '60.20 - Деятельность в области телевизионного вещания',
-  'other': 'Другие виды деятельности'
 };
 
 // Currency labels for UI

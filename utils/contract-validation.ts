@@ -6,8 +6,7 @@ import {
   CONTRACT_CONSTANTS,
   SUPPORTED_FILE_TYPES,
   SupportedMimeType,
-  ContractType,
-  OKVEDCategory
+  ContractType
 } from '@/types/contract';
 
 /**
@@ -196,7 +195,6 @@ export function validateCreateContract(data: CreateContractDTO): ContractValidat
   
   // New ORD validations
   errors.push(...validateContractType(data.contract_type));
-  errors.push(...validateOKVEDCategory(data.okved_category));
   errors.push(...validatePhoneNumber(data.advertiser_phone));
   errors.push(...validateEmail(data.advertiser_email));
   errors.push(...validateContractNumber(data.contract_number));
@@ -278,12 +276,6 @@ export function validateUpdateContract(data: UpdateContractDTO): ContractValidat
   if (data.contract_type !== undefined) {
     errors.push(...validateContractType(data.contract_type));
   }
-  
-  if (data.okved_category !== undefined) {
-    errors.push(...validateOKVEDCategory(data.okved_category));
-  }
-  
-
   
   if (data.advertiser_phone !== undefined) {
     errors.push(...validatePhoneNumber(data.advertiser_phone));
@@ -496,27 +488,6 @@ export function validateContractType(contractType: ContractType): ContractValida
       field: 'contract_type',
       message: 'Недопустимый тип договора'
     });
-  }
-  
-  return errors;
-}
-
-/**
- * Validates OKVED category
- */
-export function validateOKVEDCategory(category?: OKVEDCategory): ContractValidationError[] {
-  const errors: ContractValidationError[] = [];
-  
-  if (category) {
-    const validCategories: OKVEDCategory[] = [
-      '73.11', '73.12', '58.13', '58.14', '60.10', '60.20', 'other'
-    ];
-    if (!validCategories.includes(category)) {
-      errors.push({
-        field: 'okved_category',
-        message: 'Недопустимая категория ОКВЭД'
-      });
-    }
   }
   
   return errors;

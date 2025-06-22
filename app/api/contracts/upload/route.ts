@@ -110,7 +110,6 @@ export async function POST(request: NextRequest) {
 
       // Extract additional fields from form data
       const contract_type = formData.get('contract_type') as string || 'direct';
-      const okved_category = formData.get('okved_category') as string || undefined;
       const advertiser_legal_address = formData.get('advertiser_legal_address') as string || undefined;
       const advertiser_contact_person = formData.get('advertiser_contact_person') as string || undefined;
       const advertiser_phone = formData.get('advertiser_phone') as string || undefined;
@@ -126,7 +125,6 @@ export async function POST(request: NextRequest) {
         advertiser_name,
         advertiser_inn,
         contract_type: contract_type as any,
-        okved_category: okved_category as any,
         advertiser_legal_address,
         advertiser_contact_person,
         advertiser_phone,
@@ -237,7 +235,6 @@ export async function POST(request: NextRequest) {
 
     // Extract additional fields from form data
     const contract_type = formData.get('contract_type') as string || 'direct';
-    const okved_category = formData.get('okved_category') as string || undefined;
     const advertiser_legal_address = formData.get('advertiser_legal_address') as string || undefined;
     const advertiser_contact_person = formData.get('advertiser_contact_person') as string || undefined;
     const advertiser_phone = formData.get('advertiser_phone') as string || undefined;
@@ -258,7 +255,6 @@ export async function POST(request: NextRequest) {
       advertiser_name,
       advertiser_inn,
       contract_type: contract_type as any,
-      okved_category: okved_category as any,
       advertiser_legal_address,
       advertiser_contact_person,
       advertiser_phone,

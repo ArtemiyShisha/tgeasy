@@ -41,8 +41,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       filePath = `${userId}/${contract.file_name}`
     }
 
+    const { searchParams } = new URL(request.url)
+    const downloadFlag = searchParams.get('dl') === '1'
+
     // Signed URL for 1 hour
-    const signedUrl = await fileUploadService.getSignedUrl(filePath, 3600)
+    const signedUrl = await fileUploadService.getSignedUrl(
+      filePath,
+      3600,
+      downloadFlag ? (contract.file_name || undefined) : undefined
+    )
 
     return NextResponse.redirect(signedUrl, 302)
   } catch (error) {

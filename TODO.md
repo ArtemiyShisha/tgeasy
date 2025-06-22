@@ -1811,7 +1811,7 @@ CONTRACT SELECTOR:
 - Единая модель для всего размещения
 - Статусы: черновик, запланировано, опубликовано
 - Связи с каналами и договорами
-- Поля для ОРД (ИНН, название, описание товара)
+- Поля для ОРД (ИНН, название, описание товара, код ККТУ)
 - Медиафайлы и текстовый контент
 
 **Критерии готовности**:
@@ -1835,7 +1835,7 @@ CONTRACT SELECTOR:
 
 СТРУКТУРА РАЗМЕЩЕНИЯ:
 - Основные: content, media_urls, channel_id, contract_id
-- ОРД данные: advertiser_inn, advertiser_name, product_description, erid
+- ОРД данные: advertiser_inn, advertiser_name, product_description, erid, kktu_code
 - Статусы: draft, scheduled, published, failed
 - ОРД статусы: pending, registered, failed
 - Планирование: scheduled_at, published_at, telegram_message_id
@@ -1856,6 +1856,7 @@ REPOSITORY МЕТОДЫ:
 - advertiser_inn: российский формат (10/12 цифр)
 - media_urls: максимум 10 файлов
 - scheduled_at: не в прошлом
+- kktu_code: 6-значный код ККТУ
 
 МЕДИАФАЙЛЫ:
 - Изображения: JPEG, PNG, WebP (до 20MB)

@@ -21,11 +21,9 @@ import {
 import { FileUploadZone } from './index'
 import { useContracts, useContractUpload } from '@/hooks/use-contracts'
 import { 
-  ContractType, 
-  OKVEDCategory,
+  ContractType,
   CONTRACT_TYPE_LABELS,
   CONTRACT_TYPE_DESCRIPTIONS,
-  OKVED_CATEGORY_LABELS,
   CreateContractDTO,
   ContractUploadResponseBase
 } from '@/types/contract'
@@ -43,7 +41,6 @@ interface ContractFormData {
   advertiser_name: string
   advertiser_inn: string
   contract_type: ContractType
-  okved_category?: OKVEDCategory
   advertiser_legal_address?: string
   advertiser_contact_person?: string
   advertiser_phone?: string
@@ -61,7 +58,6 @@ interface ContractFormErrors {
   file?: string
   expires_at?: string
   contract_type?: string
-  okved_category?: string
   advertiser_legal_address?: string
   advertiser_contact_person?: string
   advertiser_phone?: string
@@ -164,7 +160,6 @@ export function ContractUploadModal({ isOpen, onClose, onSuccess }: ContractUplo
       // Add optional fields
       if (formData.expires_at) uploadData.append('expires_at', formData.expires_at)
       if (formData.contract_type) uploadData.append('contract_type', formData.contract_type)
-      if (formData.okved_category) uploadData.append('okved_category', formData.okved_category)
       if (formData.advertiser_legal_address) uploadData.append('advertiser_legal_address', formData.advertiser_legal_address)
       if (formData.advertiser_contact_person) uploadData.append('advertiser_contact_person', formData.advertiser_contact_person)
       if (formData.advertiser_phone) uploadData.append('advertiser_phone', formData.advertiser_phone)
@@ -382,31 +377,6 @@ export function ContractUploadModal({ isOpen, onClose, onSuccess }: ContractUplo
              </Select>
              {errors.contract_type && (
                <p className="mt-1 text-xs text-red-600">{errors.contract_type}</p>
-             )}
-           </div>
-
-                     {/* OKVED Category */}
-           <div>
-             <Label className="text-sm font-medium text-zinc-700">
-               ОКВЭД
-             </Label>
-             <Select
-               value={formData.okved_category?.toString() || ''}
-               onValueChange={(value) => handleInputChange('okved_category', value as OKVEDCategory)}
-             >
-               <SelectTrigger className="mt-1">
-                 <SelectValue placeholder="Выберите ОКВЭД" />
-               </SelectTrigger>
-               <SelectContent>
-                 {Object.entries(OKVED_CATEGORY_LABELS).map(([value, label]) => (
-                   <SelectItem key={value} value={value}>
-                     {label}
-                   </SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
-             {errors.okved_category && (
-               <p className="mt-1 text-xs text-red-600">{errors.okved_category}</p>
              )}
            </div>
 

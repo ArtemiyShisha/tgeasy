@@ -90,7 +90,6 @@ export class ContractService {
         advertiser_name: sanitizedData.advertiser_name,
         advertiser_inn: sanitizedData.advertiser_inn,
         contract_type: sanitizedData.contract_type || 'direct',
-        okved_category: sanitizedData.okved_category,
         advertiser_legal_address: sanitizedData.advertiser_legal_address,
         advertiser_contact_person: sanitizedData.advertiser_contact_person,
         advertiser_phone: sanitizedData.advertiser_phone,

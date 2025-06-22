@@ -24,7 +24,6 @@ function transformContractRow(contract: any): Contract {
     advertiser_name: contract.advertiser_name,
     advertiser_inn: contract.advertiser_inn,
     contract_type: contract.contract_type || 'direct',
-    okved_category: contract.okved_category || undefined,
     advertiser_legal_address: contract.advertiser_legal_address || undefined,
     advertiser_contact_person: contract.advertiser_contact_person || undefined,
     advertiser_phone: contract.advertiser_phone || undefined,

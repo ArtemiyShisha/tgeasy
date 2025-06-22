@@ -157,12 +157,16 @@ export class FileUploadService {
   /**
    * Gets a signed URL for secure file access
    */
-  async getSignedUrl(filePath: string, expiresIn: number = 3600): Promise<string> {
+  async getSignedUrl(filePath: string, expiresIn: number = 3600, downloadName?: string): Promise<string> {
     try {
       const supabase = this.getSupabaseClient();
       const { data, error } = await supabase.storage
         .from(this.bucketName)
-        .createSignedUrl(filePath, expiresIn);
+        .createSignedUrl(
+          filePath,
+          expiresIn,
+          downloadName ? { download: downloadName } : undefined
+        );
 
       if (error) {
         throw new Error(`Failed to create signed URL: ${error.message}`);

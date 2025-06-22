@@ -1,5 +1,5 @@
 // Contract UI types for TGeasy frontend
-import { Contract, ContractStatus, ContractSearchParams, ContractSearchResult, ContractStats, ContractType, OKVEDCategory } from './contract';
+import { Contract, ContractStatus, ContractSearchParams, ContractSearchResult, ContractStats, ContractType } from './contract';
 
 // UI-specific contract extensions
 export interface ContractWithUI extends Contract {
@@ -237,7 +237,6 @@ export interface CreateContractData {
   advertiser_name: string;
   advertiser_inn: string;
   contract_type: ContractType;
-  okved_category?: OKVEDCategory;
   advertiser_legal_address?: string;
   advertiser_contact_person?: string;
   advertiser_phone?: string;

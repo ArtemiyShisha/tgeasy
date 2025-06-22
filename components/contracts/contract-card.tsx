@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { Contract } from '@/types/contract'
-import { contractsApi } from '@/lib/api/contracts-api'
 
 interface ContractCardProps {
   contract: Contract
@@ -73,33 +72,20 @@ export function ContractCard({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  const handleDownload = async () => {
-    try {
-      const blob = await contractsApi.downloadContract(contract.id)
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = contract.file_name || contract.title || 'contract.pdf'
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Download failed:', error)
-      alert('Не удалось скачать файл договора')
-    }
+  const downloadUrl = `/api/contracts/${contract.id}/download?dl=1`;
+  const previewUrl = `/api/contracts/${contract.id}/download`;
+
+  const handleDownload = () => {
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = contract.file_name || contract.title || 'contract.pdf'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
   }
 
-  const handlePreview = async () => {
-    try {
-      const blob = await contractsApi.downloadContract(contract.id)
-      const url = URL.createObjectURL(blob)
-      window.open(url, '_blank')
-      setTimeout(() => URL.revokeObjectURL(url), 10000)
-    } catch (error) {
-      console.error('Preview failed:', error)
-      alert('Не удалось открыть договор для просмотра')
-    }
+  const handlePreview = () => {
+    window.open(previewUrl, '_blank')
   }
 
   return (
