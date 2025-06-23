@@ -52,7 +52,7 @@ class ChannelsApi {
   async getChannels(filters?: ChannelFilters): Promise<ChannelsListResponse> {
     const params = new URLSearchParams();
     
-    if (filters?.status) params.append('status', filters.status);
+    if (filters?.status && filters.status !== 'all') params.append('status', filters.status);
     if (filters?.permission) params.append('permission', filters.permission);
     if (filters?.search) params.append('search', filters.search);
     if (filters?.sortBy) params.append('sortBy', filters.sortBy);

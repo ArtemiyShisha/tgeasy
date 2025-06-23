@@ -55,9 +55,7 @@ interface UseChannelsReturn {
 }
 
 const defaultFilters: ChannelFilters = {
-  status: 'all',
-  sortBy: 'created_at',
-  sortOrder: 'desc'
+  status: 'all'
 };
 
 export function useChannels(options: UseChannelsOptions = {}): UseChannelsReturn {

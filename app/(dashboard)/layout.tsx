@@ -15,7 +15,8 @@ import {
   LogOut,
   Menu,
   X,
-  Zap
+  Zap,
+  Megaphone
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -32,6 +33,11 @@ const navigationItems = [
     name: 'Channels',
     href: '/channels',
     icon: Hash,
+  },
+  {
+    name: 'Рекламные размещения',
+    href: '/posts',
+    icon: Megaphone,
   },
   {
     name: 'Contracts',

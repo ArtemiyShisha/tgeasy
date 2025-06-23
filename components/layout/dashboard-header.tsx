@@ -23,15 +23,24 @@ const getBreadcrumbFromPath = (pathname: string) => {
   
   if (segments.length <= 1) return 'Dashboard';
   
-  const breadcrumbs = segments.map(segment => {
-    // Convert kebab-case to Title Case
-    return segment
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  });
+  // Special cases for Russian labels
+  const breadcrumbMap: Record<string, string> = {
+    'posts': 'Рекламные размещения',
+    'channels': 'Каналы',
+    'contracts': 'Договоры',
+    'analytics': 'Аналитика',
+    'settings': 'Настройки',
+    'new': 'Создание',
+    'edit': 'Редактирование'
+  };
   
-  return breadcrumbs[breadcrumbs.length - 1];
+  const lastSegment = segments[segments.length - 1];
+  
+  // Return mapped name or convert kebab-case to Title Case
+  return breadcrumbMap[lastSegment] || lastSegment
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 };
 
 export default function DashboardHeader() {

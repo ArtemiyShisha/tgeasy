@@ -4,6 +4,9 @@ export { channelsApi, ChannelsApiError } from './channels-api';
 // Contracts API
 export { contractsApi, ContractsApiError } from './contracts-api';
 
+// Posts API
+export { postsApi, PostsApiError } from './posts-api';
+
 // Re-export types
 export type {
   ChannelsListResponse,
@@ -21,4 +24,15 @@ export type {
   UpdateContractData,
   ContractUploadMetadata,
   ContractError
-} from '@/types/contract-ui'; 
+} from '@/types/contract-ui';
+
+export type {
+  PostsApiResponse,
+  PostApiResponse,
+  PostStatsResponse,
+  MediaUploadResponse,
+  PostPreview,
+  PostSearchOptions,
+  CreatePostData,
+  UpdatePostData
+} from '@/types/post-ui'; 

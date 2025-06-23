@@ -1138,3 +1138,229 @@ spacing: 0.5rem, 1rem, 1.5rem, 2rem, 3rem, 4rem, 6rem
 * Телефонная валидация сервер-сайд: E.164 (11-15 цифр, optional +) — синхронизирована с клиентом.
 
 > Эти изменения не затрагивают общую DDD-структуру, но уточняют механизмы **Channels** и **Contracts** доменов. Добавленные таблицы/поля отражены в `schemas/database.sql` и миграциях cloud-БД.
+
+### 2025-01-16 — Posts Domain Frontend Integration (v1.8.0) ✅ ЗАВЕРШЕНО
+
+#### Task 20: API интеграция для размещений - ПОЛНОСТЬЮ РЕАЛИЗОВАНО
+
+**Статус**: **ЗАВЕРШЕНО** - Создана полная frontend интеграция для Posts домена
+
+#### Task 21: UI создания размещений - ПОЛНОСТЬЮ РЕАЛИЗОВАНО ✨ НОВЕЙШЕЕ
+
+**Статус**: **ЗАВЕРШЕНО** - Создан профессиональный Apple-style интерфейс для создания размещений
+
+**Архитектура Posts Frontend Layer**:
+```
+┌─────────────────────────────────────────┐
+│        Posts UI Types Layer            │
+│   ├── PostFilters, PostSearchOptions   │
+│   ├── PostsApiResponse, PostApiResponse│
+│   ├── CreatePostData, UpdatePostData    │
+│   ├── MediaUploadProgress, Scheduling   │
+│   └── Form Management & Validation     │
+├─────────────────────────────────────────┤
+│        Posts API Client Layer          │
+│   ├── 20+ API methods (CRUD + Media)   │
+│   ├── File upload with validation      │
+│   ├── Scheduling & Publishing          │
+│   ├── Search & Statistics integration  │
+│   └── Comprehensive error handling     │
+├─────────────────────────────────────────┤
+│        React Hooks Layer               │
+│   ├── usePosts() - main posts hook     │
+│   ├── usePost() - single post hook     │
+│   ├── Optimistic updates with rollback │
+│   ├── Debounced search & filtering     │
+│   └── State management without SWR     │
+└─────────────────────────────────────────┘
+```
+
+**Реализованные компоненты (1,300+ строк TypeScript)**:
+
+#### **1. UI Types (`types/post-ui.ts`) - 400+ строк**
+- **Filtering & Search**: `PostFilters`, `PostSearchOptions`, `PostPaginationOptions`
+- **API Responses**: `PostsApiResponse`, `PostApiResponse`, `PostStatsResponse`
+- **CRUD Operations**: `CreatePostData`, `UpdatePostData`
+- **Media Management**: `MediaUploadProgress`, `MediaUploadOptions`, `MediaUploadResponse`
+- **Scheduling**: `SchedulePostData`, `SchedulerSlot`, `SchedulerStats`
+- **Form Management**: `PostFormState`, `PostFormActions`, `PostFormHistory`
+- **Hook Interfaces**: `UsePostsOptions`, `UsePostsReturn`, `UsePostOptions`, `UsePostReturn`
+- **Constants**: `POST_UI_CONSTANTS` с pagination, debounce, autosave настройками
+
+#### **2. API Client (`lib/api/posts-api.ts`) - 400+ строк**
+**CRUD Operations**:
+- `getPosts()` - список с фильтрацией и пагинацией
+- `getPost()` - получение одного поста
+- `createPost()`, `updatePost()`, `deletePost()`, `duplicatePost()`
+
+**Media Management**:
+- `uploadMedia()` - загрузка файлов с валидацией
+- `removeMedia()` - удаление медиафайлов
+
+**Scheduling & Publishing**:
+- `schedulePost()`, `unschedulePost()`, `reschedulePost()`
+- `publishPost()` - немедленная публикация
+
+**Search & Analytics**:
+- `searchPosts()`, `getPostsStats()`, `getPostsByChannel()`, `getPostsByContract()`
+- `getScheduledPosts()`, `getPostsByOrdStatus()`
+
+**Technical Features**:
+- Типизированная обработка ошибок с `PostsApiError`
+- Query parameter builder для фильтрации
+- File upload валидация (size, type checking)
+- Network error handling с retry логикой
+
+#### **3. React Hooks (`hooks/use-posts.ts`, `hooks/use-post.ts`) - 850+ строк**
+
+**usePosts Hook (500+ строк)**:
+- State management без SWR (следуя паттерну проекта)
+- Optimistic updates с rollback функциональностью
+- Debounced search для производительности
+- Filter persistence в localStorage
+- Pagination с `loadMore()` функцией
+- Опциональный auto-refresh
+- Statistics интеграция
+- Comprehensive error handling
+
+**usePost Hook (350+ строк)**:
+- Single post management с relations
+- CRUD операции с optimistic updates
+- Scheduling operations (schedule/unschedule/publish)
+- Media management (upload/remove)
+- Preview generation для валидации
+- Rollback логика для error recovery
+
+**Additional Hooks**:
+- `usePostsByFilter()` - посты по статусу
+- `usePostsByChannel()` - посты канала
+- `usePostsByContract()` - посты договора
+- `usePostWithRelations()` - полная загрузка данных
+- `usePostBasic()` - базовые данные только
+
+#### **4. Integration Updates**
+- ✅ **`hooks/index.ts`** - экспорт новых Posts hooks
+- ✅ **`lib/api/index.ts`** - экспорт Posts API client
+- ✅ **`types/index.ts`** - селективный экспорт типов
+
+**Технические особенности**:
+- **No SWR Dependency**: Использует стандартный fetch + state management
+- **Type Safety**: Полная типизация без `any` типов
+- **Error Handling**: Comprehensive error recovery с rollback
+- **Performance**: Debounced search, optimistic updates, pagination
+- **Architecture Consistency**: Следует паттернам `use-channels.ts`
+
+**Готовность для следующих задач**:
+- ✅ **Task 21**: UI компоненты готовы к использованию hooks
+- ✅ **Task 22**: Scheduler interface готов к интеграции
+- ✅ **Task 23**: ОРД интеграция готова к использованию API
+- ✅ **Task 25**: Publishing system готов к Telegram интеграции
+
+**Заключение**: Posts domain frontend интеграция **ПОЛНОСТЬЮ ЗАВЕРШЕНА** и готова для создания UI компонентов в следующих задачах. Архитектура обеспечивает solid foundation для всей Posts функциональности.
+
+**Архитектура Posts UI Creation Layer (Task 21)**:
+```
+┌─────────────────────────────────────────┐
+│        Apple-Style Creation UI         │
+│   ├── Split-Screen Layout (60/40)      │
+│   ├── PostCreationInterface (main)     │
+│   ├── Real-time Telegram Preview       │
+│   ├── Auto-save & Validation           │
+│   └── Comprehensive Form Management    │
+├─────────────────────────────────────────┤
+│        Specialized Components          │
+│   ├── PostEditor (content + URL)       │
+│   ├── MediaUploadZone (drag & drop)    │
+│   ├── TelegramPreview (authentic)      │
+│   ├── SchedulingPanel (datetime)       │
+│   └── AdvertiserInfoForm (ОРД data)    │
+├─────────────────────────────────────────┤
+│        Integration Layer                │
+│   ├── Channel selector с search        │
+│   ├── Contract integration             │
+│   ├── ERID автоматическая вставка      │
+│   ├── Media upload с validation        │
+│   └── Form state management            │
+└─────────────────────────────────────────┘
+```
+
+**Реализованные компоненты UI Creation (1,200+ строк TypeScript)**:
+
+#### **1. PostCreationInterface (250+ строк) - Главный компонент**
+- **Split-Screen Layout**: Editor (60%) + Preview (40%) с responsive design
+- **Auto-save функциональность**: Каждые 30 секунд с visual indicator
+- **Form state management**: Comprehensive validation с error handling
+- **Action handlers**: Save draft, Publish now, Schedule для публикации
+- **Integration hooks**: useChannels, useContracts, usePosts для data management
+
+#### **2. PostEditor (90+ строк) - Редактор контента**
+- **Content textarea**: Auto-resize с character counter (4096 лимит)
+- **URL input**: Validation для target links
+- **Apple-style design**: Clean borders, focus states, error highlighting
+- **Real-time validation**: Character count с red warning при превышении
+
+#### **3. MediaUploadZone (180+ строк) - Загрузка медиа**
+- **Drag & Drop interface**: Clean dashed border с hover states
+- **Multiple file support**: До 10 файлов с size validation (20MB)
+- **Image preview**: Thumbnail grid с remove buttons
+- **Progress tracking**: Loading states с spinner indicators
+- **File validation**: Type checking (image/*) с error messages
+
+#### **4. TelegramPreview (170+ строк) - Превью сообщения**
+- **Authentic Telegram styling**: Channel branding с avatar display
+- **Content rendering**: Whitespace preservation с ERID integration
+- **Media preview**: Single/multiple images с grid layout
+- **URL preview**: Link cards с external link icons
+- **Statistics display**: Character/image count с validation colors
+
+#### **5. SchedulingPanel (200+ строк) - Планирование публикации**
+- **Publish options**: Toggle между "Publish now" и "Schedule"
+- **DateTime picker**: HTML5 datetime-local с minimum validation
+- **Quick suggestions**: "Через час", "Завтра в 9:00", "Завтра в 18:00"
+- **Timezone display**: Current timezone с formatted date preview
+- **Schedule confirmation**: Visual confirmation с formatted date display
+
+#### **6. AdvertiserInfoForm (250+ строк) - Информация о рекламодателе**
+- **Channel selector**: Dropdown с channel branding и search
+- **Contract integration**: Optional contract selection с preview
+- **ИНН validation**: Real-time validation (10/12 цифр) с counter
+- **Advertiser fields**: Name, product description с required validation
+- **Cost tracking**: Optional placement cost с currency selection
+
+**Apple-Style Design Implementation**:
+- **Minimal Color Palette**: White, zinc grays, blue accents без bright colors
+- **Clean Typography**: Inter font с proper hierarchy и readable sizes
+- **Subtle Interactions**: Simple hover effects, smooth transitions, no animations
+- **Content-First Layout**: Focus на functionality без decorative elements
+- **Professional Aesthetics**: Business-appropriate design для productivity
+
+**Technical Architecture Benefits**:
+- **Component Isolation**: Каждый компонент независим с clear interfaces
+- **Type Safety**: Полная TypeScript типизация без any types
+- **Error Handling**: Comprehensive validation с user-friendly messages
+- **Performance**: Optimized re-renders с proper useCallback usage
+- **Accessibility**: Proper labels, focus management, keyboard navigation
+
+**Integration Readiness**:
+- ✅ **Task 22**: UI управления размещениями (components готовы)
+- ✅ **Task 23**: ОРД интеграция (advertiser form готов)
+- ✅ **Task 25**: Publishing system (Telegram preview готов)
+- ✅ **Task 26**: Analytics (UI patterns established)
+
+**Production Deployment Status**: Ready для deployment с complete UI creation workflow
+
+### 2025-02-18 — Incremental Architecture Update (v1.8.1)
+
+#### Posts domain
+* Добавлены колонки `creative_images JSONB`, `placement_cost NUMERIC(12,2)`, `placement_currency VARCHAR(3)` в таблицу `posts`.
+* `PostService` автоматически подставляет `advertiser_inn`/`advertiser_name` из выбранного договора при требуемой маркировке.
+* `PostRepository` реализует безопасный парсинг `creative_images` для поддержки JSONB и строковых значений из старых записей.
+
+#### UI Layer
+* Компонент `Checkbox` обновлён – теперь кликабельна вся область (label + box).
+* В форме маркировки (`MarkingForm`) поле ERID снабжено иконками: копирование в буфер обмена и очистка токена.
+
+#### Deployment
+* Production URL (Vercel): `https://tgeasy-mneina6lw-shishkinartemiy-gmailcoms-projects.vercel.app`.
+
+> Эти изменения корректируют модель данных и улучшают UX постов, устраняя критические 500-ошибки и повышая удобство работы с маркировкой.

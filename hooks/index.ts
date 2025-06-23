@@ -5,6 +5,19 @@ export { useChannelStatus } from './use-channel-status';
 export { useAuth } from './use-auth';
 export { useContracts, useContract, useContractUpload, useContractSearch } from './use-contracts';
 
+// Posts hooks
+export { 
+  usePosts, 
+  usePostsByFilter, 
+  usePostsByChannel, 
+  usePostsByContract 
+} from './use-posts';
+export { 
+  usePost, 
+  usePostWithRelations, 
+  usePostBasic 
+} from './use-post';
+
 // Re-export types for convenience
 export type {
   UseChannelsOptions,
@@ -23,4 +36,15 @@ export type {
   UseContractUploadReturn,
   UseContractSearchOptions,
   UseContractSearchReturn
-} from '@/types/contract-ui'; 
+} from '@/types/contract-ui';
+
+export type {
+  UsePostsOptions,
+  UsePostsReturn,
+  UsePostOptions,
+  UsePostReturn,
+  PostFilters,
+  CreatePostData,
+  UpdatePostData,
+  PostSearchOptions
+} from '@/types/post-ui'; 
