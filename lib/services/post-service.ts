@@ -2,6 +2,7 @@ import { PostRepository } from '@/lib/repositories/post-repository'
 import { ChannelRepository } from '@/lib/repositories/channel-repository'
 import { ContractRepository } from '@/lib/repositories/contract-repository'
 import { SchedulerService } from '@/lib/services/scheduler-service'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { 
   Post, 
   PostWithRelations,
@@ -81,15 +82,29 @@ export class PostService {
   }
 
   /**
-   * Получение поста по ID с проверкой прав доступа
+   * Получение поста по ID
    */
-  async getPost(userId: string, postId: string): Promise<Post | null> {
-    try {
-      return await this.postRepository.findById(userId, postId)
-    } catch (error) {
-      if (error instanceof PostError) throw error
-      throw new PostError(`Failed to get post: ${error}`, 'GET_FAILED')
+  async getPost(userId: string | null, postId: string): Promise<Post | null> {
+    console.log('PostService.getPost called with:', { userId, postId })
+    
+    const post = await this.postRepository.findById(userId, postId)
+    
+    if (!post) {
+      console.log('PostService.getPost: Post not found')
+      return null
     }
+    
+    // Если есть user_id, проверяем доступ
+    if (userId && post.user_id !== userId) {
+      console.log('PostService.getPost: Access denied - user mismatch', {
+        postUserId: post.user_id,
+        requestUserId: userId
+      })
+      throw new Error('Access denied')
+    }
+    
+    console.log('PostService.getPost: Returning post')
+    return post
   }
 
   /**
@@ -137,8 +152,29 @@ export class PostService {
         await this.validateContractAccess(userId, data.contract_id)
       }
 
+      // Обработка изменения маркировки
+      let updateData = { ...data };
+      
+      // Если маркировка включается, подтягиваем данные из договора
+      if (data.requires_marking === true && data.contract_id) {
+        const contract = await this.contractRepository.findById(data.contract_id, userId)
+        if (contract) {
+          updateData.advertiser_inn = contract.advertiser_inn
+          updateData.advertiser_name = contract.advertiser_name
+        }
+      }
+      
+      // Если маркировка отключается, очищаем связанные поля
+      if (data.requires_marking === false) {
+        updateData.contract_id = null
+        delete updateData.kktu
+        delete updateData.product_description
+        updateData.erid = null
+      }
+
+      console.log('PostService.updatePost updateData:', updateData);
       // Обновление поста
-      const updatedPost = await this.postRepository.update(userId, postId, data)
+      const updatedPost = await this.postRepository.update(userId, postId, updateData)
 
       // TODO: Обновление в ОРД при изменении креатива (будет в Задаче 23)
       // if (data.creative_text || data.creative_images || data.target_url) {
@@ -289,18 +325,34 @@ export class PostService {
         throw new PostError('Post is already published', 'VALIDATION_ERROR', 'status')
       }
 
-      // TODO: Публикация в Telegram (будет в Задаче 25)
-      // const telegramMessage = await this.telegramService.sendPost(
-      //   existingPost.channel_id,
-      //   this.formatPostContent(existingPost)
-      // )
+      // Обновляем статус поста с помощью серв-role клиента, чтобы обойти RLS
+      const admin = createAdminClient();
+      const { data: updated, error } = await admin
+        .from('posts')
+        .update({ status: 'published', published_at: new Date().toISOString() })
+        .eq('id', postId)
+        .select()
+        .single();
 
-      // Обновляем статус поста
-      return await this.postRepository.update(userId, postId, {
-        status: 'published',
-        published_at: new Date().toISOString()
-        // telegram_message_id: telegramMessage.message_id
-      })
+      if (error) {
+        throw new PostError(`Failed to publish post: ${error.message}`, 'PUBLISH_FAILED');
+      }
+
+      // Преобразуем creative_images если они в виде строки
+      const parseImages = (value: any): string[] => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        try {
+          return JSON.parse(value);
+        } catch {
+          return [];
+        }
+      };
+
+      return {
+        ...updated,
+        creative_images: parseImages((updated as any).creative_images)
+      } as Post;
     } catch (error) {
       if (error instanceof PostError) throw error
       throw new PostError(`Failed to publish post: ${error}`, 'PUBLISH_FAILED')

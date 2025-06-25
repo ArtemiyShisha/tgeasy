@@ -122,7 +122,43 @@ export const UpdatePostSchema = PostBaseSchema.partial().extend({
   ord_error_message: z.string().max(500, 'Сообщение об ошибке слишком длинное').optional().nullable(),
   scheduled_at: z.string().datetime('Некорректная дата планирования').optional().nullable(),
   published_at: z.string().datetime('Некорректная дата публикации').optional().nullable(),
-  telegram_message_id: z.number().int('ID сообщения должен быть целым числом').positive().optional().nullable()
+  telegram_message_id: z.number().int('ID сообщения должен быть целым числом').positive().optional().nullable(),
+  requires_marking: z.boolean().optional(),
+  kktu: z.string().optional().nullable(),
+  product_description: z.string().optional().nullable()
+}).superRefine((data, ctx) => {
+  // Проверяем только при необходимости маркировки
+  if (data.requires_marking === true) {
+    if (!data.contract_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Договор обязателен при маркировке',
+        path: ['contract_id']
+      })
+    }
+
+    if (!data.kktu || data.kktu.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'ККТУ обязателен при маркировке',
+        path: ['kktu']
+      })
+    } else if (!POST_CONSTANTS.KKTU_REGEX.test(data.kktu.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'ККТУ должен состоять из 6 цифр',
+        path: ['kktu']
+      })
+    }
+
+    if (!data.product_description || data.product_description.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Описание товара обязательно при маркировке',
+        path: ['product_description']
+      })
+    }
+  }
 })
 
 // Схема для планирования поста

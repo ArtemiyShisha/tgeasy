@@ -107,6 +107,7 @@ export interface UpdatePostInput {
   advertiser_name?: string | null
   product_description?: string | null
   kktu?: string | null
+  requires_marking?: boolean
   erid?: string | null
   ord_status?: OrdStatus
   ord_error_message?: string | null

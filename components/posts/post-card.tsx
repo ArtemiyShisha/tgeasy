@@ -9,26 +9,21 @@ import { PostStatusBadge } from './post-status-badge';
 import { 
   MoreHorizontal,
   Edit,
-  Calendar,
   Send,
-  Copy,
-  Trash2
+  Trash2,
+  BarChart2
 } from 'lucide-react';
 
 interface PostCardProps {
   post: Post;
-  onDuplicate?: (id: string) => void;
   onDelete?: (id: string) => void;
   onPublish?: (id: string) => void;
-  onSchedule?: (id: string) => void;
 }
 
 export function PostCard({ 
   post, 
-  onDuplicate, 
   onDelete, 
-  onPublish, 
-  onSchedule 
+  onPublish 
 }: PostCardProps) {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '—';
@@ -77,42 +72,65 @@ export function PostCard({
               align="end" 
               className="w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-lg"
             >
-              <DropdownMenuItem asChild>
-                <Link href={`/posts/${post.id}/edit`} className="flex items-center">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Редактировать
-                </Link>
-              </DropdownMenuItem>
-              
-              {post.status === 'draft' && onPublish && (
-                <DropdownMenuItem onClick={() => onPublish(post.id)}>
-                  <Send className="w-4 h-4 mr-2" />
-                  Опубликовать
-                </DropdownMenuItem>
+              {/* Draft: only Edit & Delete */}
+              {post.status === 'draft' && (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/posts/${post.id}/edit`} className="flex items-center">
+                      <Edit className="w-4 h-4 mr-2" />
+                      Редактировать
+                    </Link>
+                  </DropdownMenuItem>
+                  {onDelete && (
+                    <DropdownMenuItem 
+                      onClick={() => onDelete(post.id)}
+                      className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Удалить
+                    </DropdownMenuItem>
+                  )}
+                </>
               )}
-              
-              {(post.status === 'draft' || post.status === 'scheduled') && onSchedule && (
-                <DropdownMenuItem onClick={() => onSchedule(post.id)}>
-                  <Calendar className="w-4 h-4 mr-2" />
-                  {post.status === 'scheduled' ? 'Изменить время' : 'Запланировать'}
-                </DropdownMenuItem>
+
+              {/* Scheduled: Publish, Edit, Duplicate, Delete */}
+              {post.status === 'scheduled' && (
+                <>
+                  {onPublish && (
+                    <DropdownMenuItem onClick={() => onPublish(post.id)}>
+                      <Send className="w-4 h-4 mr-2" />
+                      Опубликовать
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem asChild>
+                    <Link href={`/posts/${post.id}/edit`} className="flex items-center">
+                      <Edit className="w-4 h-4 mr-2" />
+                      Редактировать
+                    </Link>
+                  </DropdownMenuItem>
+                  {onDelete && (
+                    <DropdownMenuItem 
+                      onClick={() => onDelete(post.id)}
+                      className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Удалить
+                    </DropdownMenuItem>
+                  )}
+                </>
               )}
-              
-              {onDuplicate && (
-                <DropdownMenuItem onClick={() => onDuplicate(post.id)}>
-                  <Copy className="w-4 h-4 mr-2" />
-                  Дублировать
-                </DropdownMenuItem>
-              )}
-              
-              {onDelete && (
-                <DropdownMenuItem 
-                  onClick={() => onDelete(post.id)}
-                  className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Удалить
-                </DropdownMenuItem>
+
+              {/* Published: Stats */}
+              {post.status === 'published' && (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/posts/${post.id}/stats`} className="flex items-center">
+                      <BarChart2 className="w-4 h-4 mr-2" />
+                      Статистика
+                    </Link>
+                  </DropdownMenuItem>
+                  {/* Delete disabled for published */}
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>

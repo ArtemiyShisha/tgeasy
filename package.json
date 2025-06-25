@@ -15,6 +15,8 @@
     "webhook:check": "node scripts/update-telegram-webhook.js --check"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.0.0",
+    "@emoji-mart/react": "^1.1.1",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-dropdown-menu": "^2.1.15",
@@ -33,15 +35,14 @@
     "dotenv": "^16.5.0",
     "framer-motion": "^12.18.1",
     "lucide-react": "^0.379.0",
-    "@emoji-mart/react": "^1.1.1",
-    "@emoji-mart/data": "^1.0.0",
-    "twemoji": "^14.0.0",
     "next": "14.2.3",
     "next-themes": "^0.4.6",
     "react": "^18",
     "react-dom": "^18",
+    "sonner": "^2.0.5",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
+    "twemoji": "^14.0.0",
     "zod": "^3.25.64"
   },
   "devDependencies": {

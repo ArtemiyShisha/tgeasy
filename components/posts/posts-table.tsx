@@ -14,10 +14,9 @@ import {
   FileText,
   Loader2,
   MoreHorizontal,
-  Copy,
-  Trash2,
   Send,
-  Calendar
+  BarChart2,
+  Trash2
 } from 'lucide-react';
 
 interface PostsTableProps {
@@ -26,10 +25,8 @@ interface PostsTableProps {
   selectedIds?: Set<string>;
   onSelectPost?: (postId: string, checked: boolean) => void;
   onSelectAll?: (checked: boolean) => void;
-  onDuplicate?: (id: string) => void;
   onDelete?: (id: string) => void;
   onPublish?: (id: string) => void;
-  onSchedule?: (id: string) => void;
 }
 
 export function PostsTable({ 
@@ -38,10 +35,8 @@ export function PostsTable({
   selectedIds = new Set(),
   onSelectPost,
   onSelectAll,
-  onDuplicate, 
   onDelete, 
-  onPublish, 
-  onSchedule 
+  onPublish 
 }: PostsTableProps) {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '—';
@@ -82,7 +77,7 @@ export function PostsTable({
             <p className="text-zinc-500 dark:text-zinc-400 mb-4">
               Создайте первое рекламное размещение для начала работы
             </p>
-            <Link href="/dashboard/posts/new">
+            <Link href="/posts/new">
               <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                 <Plus className="w-4 h-4 mr-2" />
                 Создать размещение
@@ -161,35 +156,32 @@ export function PostsTable({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/posts/${post.id}/edit`} className="flex items-center">
-                        <Edit className="w-4 h-4 mr-2" />
-                        Редактировать
-                      </Link>
-                    </DropdownMenuItem>
+                    {post.status !== 'published' && (
+                      <DropdownMenuItem asChild>
+                        <Link href={`/posts/${post.id}/edit`} className="flex items-center">
+                          <Edit className="w-4 h-4 mr-2" />
+                          Редактировать
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     
-                    {post.status === 'draft' && onPublish && (
+                    {post.status === 'scheduled' && onPublish && (
                       <DropdownMenuItem onClick={() => onPublish(post.id)}>
                         <Send className="w-4 h-4 mr-2" />
                         Опубликовать
                       </DropdownMenuItem>
                     )}
                     
-                    {(post.status === 'draft' || post.status === 'scheduled') && onSchedule && (
-                      <DropdownMenuItem onClick={() => onSchedule(post.id)}>
-                        <Calendar className="w-4 h-4 mr-2" />
-                        {post.status === 'scheduled' ? 'Изменить время' : 'Запланировать'}
+                    {post.status === 'published' && (
+                      <DropdownMenuItem asChild>
+                        <Link href={`/posts/${post.id}/stats`} className="flex items-center">
+                          <BarChart2 className="w-4 h-4 mr-2" />
+                          Статистика
+                        </Link>
                       </DropdownMenuItem>
                     )}
                     
-                    {onDuplicate && (
-                      <DropdownMenuItem onClick={() => onDuplicate(post.id)}>
-                        <Copy className="w-4 h-4 mr-2" />
-                        Дублировать
-                      </DropdownMenuItem>
-                    )}
-                    
-                    {onDelete && (
+                    {onDelete && post.status !== 'published' && (
                       <DropdownMenuItem 
                         onClick={() => onDelete(post.id)}
                         className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"

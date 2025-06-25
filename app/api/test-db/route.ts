@@ -1,83 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 
-export async function GET(request: NextRequest) {
+export const dynamic = 'force-dynamic'
+
+export async function GET() {
   try {
     console.log('Testing database connection...')
-    console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
-    console.log('Service Role Key exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
-    console.log('Service Role Key length:', process.env.SUPABASE_SERVICE_ROLE_KEY?.length)
-    console.log('Anon Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-    console.log('Anon Key length:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length)
-
-    // Тест с ANON ключом
-    console.log('\n--- Testing with ANON key ---')
-    const supabaseAnon = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-
-    const { data: anonTest, error: anonError } = await supabaseAnon
-      .from('users')
-      .select('*')
-      .limit(1)
-
-    if (anonError) {
-      console.error('ANON key error:', {
-        message: anonError.message,
-        details: anonError.details,
-        hint: anonError.hint,
-        code: anonError.code
-      })
-    } else {
-      console.log('ANON key works! Found', anonTest?.length, 'users')
+    
+    // Check environment variables
+    const envCheck = {
+      supabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      serviceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     }
-
-    // Тест с SERVICE ROLE ключом
-    console.log('\n--- Testing with SERVICE ROLE key ---')
-    const supabaseService = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
-    const { data: serviceTest, error: serviceError } = await supabaseService
-      .from('users')
-      .select('*')
-      .limit(1)
-
-    if (serviceError) {
-      console.error('SERVICE ROLE key error:', {
-        message: serviceError.message,
-        details: serviceError.details,
-        hint: serviceError.hint,
-        code: serviceError.code
-      })
-    } else {
-      console.log('SERVICE ROLE key works! Found', serviceTest?.length, 'users')
+    
+    console.log('Environment check:', envCheck)
+    
+    if (!envCheck.supabaseUrl || !envCheck.serviceRoleKey) {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing environment variables',
+        envCheck
+      }, { status: 500 })
     }
-
+    
+    // Create client
+    const supabase = createAdminClient()
+    
+    // Test simple query
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id')
+      .limit(1)
+    
+    if (usersError) {
+      console.error('Users query error:', usersError)
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to query users table',
+        details: usersError
+      }, { status: 500 })
+    }
+    
+    // Test posts query
+    const { data: posts, error: postsError } = await supabase
+      .from('posts')
+      .select('id, title')
+      .limit(1)
+    
+    if (postsError) {
+      console.error('Posts query error:', postsError)
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to query posts table',
+        details: postsError
+      }, { status: 500 })
+    }
+    
     return NextResponse.json({
       success: true,
-      results: {
-        anonKey: {
-          works: !anonError,
-          error: anonError?.message,
-          dataCount: anonTest?.length || 0
-        },
-        serviceRoleKey: {
-          works: !serviceError,
-          error: serviceError?.message,
-          dataCount: serviceTest?.length || 0
-        }
+      message: 'Database connection successful',
+      data: {
+        usersCount: users?.length || 0,
+        postsCount: posts?.length || 0,
+        envCheck
       }
     })
-
-  } catch (error) {
-    console.error('Test error:', error)
+  } catch (error: any) {
+    console.error('Database test error:', error)
     return NextResponse.json({
       success: false,
-      error: 'Test failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    })
+      error: error.message,
+      stack: error.stack
+    }, { status: 500 })
   }
 } 

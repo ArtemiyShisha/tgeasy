@@ -225,17 +225,9 @@ export function validateUpdatePostInput(data: UpdatePostInput): PostError[] {
 
   // Валидация текста креатива (если указан)
   if (data.creative_text !== undefined) {
-    if (!data.creative_text || data.creative_text.trim().length === 0) {
-      errors.push(new PostError('Текст креатива не может быть пустым', 'VALIDATION_ERROR', 'creative_text'))
-    } else if (data.creative_text.length > POST_CONSTANTS.MAX_CREATIVE_TEXT_LENGTH) {
+    if (data.creative_text.length > POST_CONSTANTS.MAX_CREATIVE_TEXT_LENGTH) {
       errors.push(new PostError(
         `Текст креатива не должен превышать ${POST_CONSTANTS.MAX_CREATIVE_TEXT_LENGTH} символов`, 
-        'VALIDATION_ERROR', 
-        'creative_text'
-      ))
-    } else if (data.creative_text.length < POST_CONSTANTS.MIN_CREATIVE_TEXT_LENGTH) {
-      errors.push(new PostError(
-        `Текст креатива должен содержать минимум ${POST_CONSTANTS.MIN_CREATIVE_TEXT_LENGTH} символ`, 
         'VALIDATION_ERROR', 
         'creative_text'
       ))

@@ -17,10 +17,8 @@ interface PostsGridProps {
   isLoading: boolean;
   selectedIds?: Set<string>;
   onSelectPost?: (postId: string, checked: boolean) => void;
-  onDuplicate?: (id: string) => void;
   onDelete?: (id: string) => void;
   onPublish?: (id: string) => void;
-  onSchedule?: (id: string) => void;
 }
 
 export function PostsGrid({ 
@@ -28,10 +26,8 @@ export function PostsGrid({
   isLoading,
   selectedIds = new Set(),
   onSelectPost,
-  onDuplicate, 
   onDelete, 
-  onPublish, 
-  onSchedule 
+  onPublish 
 }: PostsGridProps) {
 
   if (isLoading) {
@@ -59,7 +55,7 @@ export function PostsGrid({
             <p className="text-zinc-500 dark:text-zinc-400 mb-4">
               Создайте первое рекламное размещение для начала работы
             </p>
-            <Link href="/dashboard/posts/new">
+            <Link href="/posts/new">
               <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                 <Plus className="w-4 h-4 mr-2" />
                 Создать размещение
@@ -86,10 +82,8 @@ export function PostsGrid({
           )}
           <PostCard
             post={post}
-            onDuplicate={onDuplicate}
             onDelete={onDelete}
             onPublish={onPublish}
-            onSchedule={onSchedule}
           />
         </div>
       ))}

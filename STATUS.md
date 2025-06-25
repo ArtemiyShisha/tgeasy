@@ -5,7 +5,7 @@
 ## 📋 Общий статус проекта
 
 **Статус**: 🚀 **В активной разработке**
-**Production URL**: `https://tgeasy-nb7uadoju-shishkinartemiy-gmailcoms-projects.vercel.app`
+**Production URL**: `https://tgeasy-gwan46ah7-shishkinartemiy-gmailcoms-projects.vercel.app`
 **Дизайн-подход**: 🍎 **Apple-Inspired Design System** (переход от ярких цветов к минимализму)
 
 ## ✅ Завершенные компоненты
@@ -147,7 +147,7 @@
 
 ### 🌐 Deployment Information
 - **Platform**: Vercel с automatic deployments
-- **Apple-Style URL**: `https://tgeasy-nb7uadoju-shishkinartemiy-gmailcoms-projects.vercel.app`
+- **Apple-Style URL**: `https://tgeasy-gwan46ah7-shishkinartemiy-gmailcoms-projects.vercel.app`
 - **Build Status**: ✅ Successful deployments
 - **Performance**: Улучшенная читаемость и профессиональный внешний вид после Apple redesign
 

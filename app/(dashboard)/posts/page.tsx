@@ -1,40 +1,36 @@
 'use client';
 
 import { PostsManagementInterface } from '@/components/posts/posts-management-interface';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { CheckCircle, Calendar, Save } from 'lucide-react';
 
 function PostsPageContent() {
   const searchParams = useSearchParams();
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const router = useRouter();
 
+  const initialMessage = (() => {
+    if (searchParams.get('published') === 'true') return 'Размещение успешно опубликовано!';
+    if (searchParams.get('scheduled') === 'true') return 'Размещение успешно запланировано!';
+    if (searchParams.get('saved') === 'true') return 'Черновик размещения сохранен!';
+    return null;
+  })();
+
+  const [successMessage, setSuccessMessage] = useState<string | null>(initialMessage);
+
+  // Автозакрытие
   useEffect(() => {
-    // Check for success parameters
-    if (searchParams.get('published') === 'true') {
-      setSuccessMessage('Размещение успешно опубликовано!');
-    } else if (searchParams.get('scheduled') === 'true') {
-      setSuccessMessage('Размещение успешно запланировано!');
-    } else if (searchParams.get('saved') === 'true') {
-      setSuccessMessage('Черновик размещения сохранен!');
-    }
-
-    // Clear message after 5 seconds
-    if (successMessage) {
-      const timer = setTimeout(() => {
-        setSuccessMessage(null);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [searchParams, successMessage]);
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 5000);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
 
   const getSuccessIcon = () => {
-    if (searchParams.get('published') === 'true') {
+    if (successMessage?.includes('опубликовано')) {
       return <CheckCircle className="w-5 h-5 text-green-600" />;
-    } else if (searchParams.get('scheduled') === 'true') {
+    } else if (successMessage?.includes('запланировано')) {
       return <Calendar className="w-5 h-5 text-blue-600" />;
-    } else if (searchParams.get('saved') === 'true') {
+    } else if (successMessage?.includes('сохранен')) {
       return <Save className="w-5 h-5 text-emerald-600" />;
     }
     return <CheckCircle className="w-5 h-5 text-green-600" />;
@@ -51,7 +47,11 @@ function PostsPageContent() {
               {successMessage}
             </div>
             <button
-              onClick={() => setSuccessMessage(null)}
+              type="button"
+              onClick={() => {
+                setSuccessMessage(null);
+                router.replace('/posts');
+              }}
               className="ml-auto text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
             >
               <span className="sr-only">Закрыть</span>

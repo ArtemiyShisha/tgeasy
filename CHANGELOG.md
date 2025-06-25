@@ -1,5 +1,14 @@
 # TGeasy Changelog
 
+## [1.8.2] - 2025-02-20 - Post Status Sync Fix ✅
+
+### 🐞 Исправления
+- **Post statuses**: При редактировании запланированного поста и сохранении его как черновик статус теперь немедленно обновляется на `draft` в списке постов. Исправлено добавлением явного поля `status: 'draft'` в payload метода сохранения и оптимистичных обновлений хука `usePosts`.
+- **Database update**: `requires_marking` больше не передаётся в `UPDATE`, что устраняет ошибку PGRST204 в Supabase.
+
+### 🚀 Deployment
+- Production redeploy: `https://tgeasy-gwan46ah7-shishkinartemiy-gmailcoms-projects.vercel.app`
+
 ## [1.8.1] - 2025-02-18 - Bug Fixes & UI Improvements 🛠️
 
 ### 🐞 Исправления
@@ -140,101 +149,32 @@
 
 ---
 
-## [1.7.0] - 2025-01-16 - Posts Domain Frontend Integration
+## [1.7.0] - 2025-02-10 - Multi-user Channels & Contracts File Actions
 
-### 📝 ЗАДАЧА 20: API ИНТЕГРАЦИЯ ДЛЯ РАЗМЕЩЕНИЙ - ЗАВЕРШЕНО
+### 🔗 Multi-user Channels
+* **Shared ownership**: один Telegram-канал теперь может быть привязан к нескольким пользователям одновременно.  
+  – Таблица `channel_permissions` используется как источник прав.  
+  – Поле `disconnected_by_users UUID[]` хранит, кто скрывал канал из своего интерфейса.  
+* **Подключение**: при попытке добавить уже существующий канал создаётся/обновляется запись в `channel_permissions` вместо падения с `duplicate key`.  
+* **Отключение**: endpoint `POST /api/channels/[id]/disconnect` удаляет запись из `channel_permissions` и добавляет пользователя в `disconnected_by_users` – канал пропадает только у него.
 
-**Создана полная frontend интеграция для Posts домена с comprehensive hooks и API client**
+### 📄 Contracts — Preview & Download
+* Dropdown-меню карточек/строк договоров теперь рабочее:
+  – **Просмотр** открывает PDF в новой вкладке.  
+  – **Скачать** отдаёт файл напрямую.  
+* Добавлен endpoint `GET /api/contracts/[id]/download` — генерирует signed URL из bucket `contracts` и делает 302 redirect.  
+* Frontend использует `contractsApi.downloadContract()` для обоих действий.
 
-### ✅ Реализованные компоненты (4 файла, 1,300+ строк TypeScript)
+### 👥 Authentication Fixes
+* Backend распознаёт пользователя через cookie `user_id` при работе с service-role ключом (пока сессии Supabase не настроены).
 
-#### UI Types Layer (`types/post-ui.ts`) - 400+ строк
-- **Filtering & Search**: `PostFilters`, `PostSearchOptions`, `PostPaginationOptions`
-- **API Responses**: `PostsApiResponse`, `PostApiResponse`, `PostStatsResponse`
-- **CRUD Operations**: `CreatePostData`, `UpdatePostData` с validation
-- **Media Management**: `MediaUploadProgress`, `MediaUploadOptions`, `MediaUploadResponse`
-- **Scheduling**: `SchedulePostData`, `SchedulerSlot`, `SchedulerStats`
-- **Form Management**: `PostFormState`, `PostFormActions`, `PostFormHistory`
-- **Hook Interfaces**: `UsePostsOptions`, `UsePostsReturn`, `UsePostOptions`, `UsePostReturn`
-- **Constants**: `POST_UI_CONSTANTS` с pagination, debounce, autosave настройками
+### 📱 Validation Tweaks
+* Телефонный номер: серверная валидация упрощена до E.164 (11-15 цифр).  
+* ИНН: строгая проверка контрольной суммы оставлена; сообщение об ошибке уточнено.
 
-#### API Client Layer (`lib/api/posts-api.ts`) - 400+ строк
-- **CRUD Operations**: `getPosts()`, `getPost()`, `createPost()`, `updatePost()`, `deletePost()`, `duplicatePost()`
-- **Media Management**: `uploadMedia()`, `removeMedia()` с file validation
-- **Scheduling**: `schedulePost()`, `unschedulePost()`, `reschedulePost()`
-- **Publishing**: `publishPost()` для немедленной публикации
-- **Search & Analytics**: `searchPosts()`, `getPostsStats()`, `getPostsByChannel()`, `getPostsByContract()`
-- **Scheduler**: `getSchedulerStats()`, `getAvailableSlots()`
-- **Error Handling**: Типизированная обработка ошибок с `PostsApiError`
-
-#### React Hooks Layer (2 файла, 850+ строк)
-
-**usePosts Hook (`hooks/use-posts.ts`) - 500+ строк**:
-- State management без SWR (следуя паттерну проекта)
-- Optimistic updates с rollback функциональностью
-- Debounced search для производительности
-- Filter persistence в localStorage
-- Pagination с `loadMore()` функцией
-- Опциональный auto-refresh
-- Statistics integration
-
-**usePost Hook (`hooks/use-post.ts`) - 350+ строк**:
-- Single post management с relations
-- CRUD операции с optimistic updates
-- Scheduling operations (schedule/unschedule/publish)
-- Media management (upload/remove)
-- Preview generation для валидации
-- Rollback логика для error recovery
-
-#### Integration Updates
-- ✅ **`hooks/index.ts`** - экспорт новых Posts hooks
-- ✅ **`lib/api/index.ts`** - экспорт Posts API client
-- ✅ **`types/index.ts`** - селективный экспорт типов
-
-### 🎯 Technical Features
-
-#### Architecture Consistency
-- **No SWR Dependency**: Использует стандартный fetch + state management
-- **Pattern Matching**: Следует архитектуре `use-channels.ts` и `channels-api.ts`
-- **Type Safety**: Полная типизация без `any` типов
-- **Error Handling**: Comprehensive error recovery с rollback
-
-#### Advanced Functionality
-- **Optimistic Updates**: Мгновенные UI обновления с error rollback
-- **Media Upload**: File validation (size, type checking) с progress tracking
-- **Search & Filtering**: Debounced search с localStorage persistence
-- **Scheduling**: Complete scheduling system с conflict detection
-- **Statistics**: Integration с analytics для performance metrics
-
-### 🚀 Готовность для следующих задач
-
-#### Immediate Next Steps
-- ✅ **Task 21**: UI компоненты готовы к использованию hooks
-- ✅ **Task 22**: Scheduler interface готов к интеграции
-- ✅ **Task 23**: ОРД интеграция готова к использованию API
-- ✅ **Task 25**: Publishing system готов к Telegram интеграции
-
-#### Posts Domain Foundation
-- **Complete API Coverage**: 20+ методов для всех Posts операций
-- **Comprehensive State Management**: 8 hooks для различных use cases
-- **Production Ready**: Error handling, validation, performance optimization
-- **Scalable Architecture**: Готов для расширения функциональности
-
-### 📊 Implementation Statistics
-
-#### Code Quality Metrics
-- **Lines of Code**: 1,300+ строк высококачественного TypeScript
-- **Type Coverage**: 100% типизация всех интерфейсов
-- **Error Handling**: Comprehensive error recovery во всех операциях
-- **Performance**: Debounced search, optimistic updates, efficient pagination
-
-#### Architecture Benefits
-- **Maintainability**: Clear separation of concerns между layers
-- **Testability**: Isolated functions и hooks для unit testing
-- **Scalability**: Extensible architecture для future features
-- **Consistency**: Unified patterns across всей Posts domain
-
-**Заключение**: Posts domain frontend интеграция полностью завершена и готова для создания UI компонентов. Архитектура обеспечивает solid foundation для всей Posts функциональности с focus на performance, type safety, и user experience.
+### 🛠 Misc
+* Генерация ASCII-slug имён файлов для Supabase Storage (исправлена ошибка «Invalid key»).
+* Обновлён `ChannelRepository.getUserChannels` — возвращает как собственные, так и каналы из `channel_permissions`.
 
 ---
 

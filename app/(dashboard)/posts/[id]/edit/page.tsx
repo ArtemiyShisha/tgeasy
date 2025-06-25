@@ -7,12 +7,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { 
   ArrowLeft,
   Loader2,
-  AlertCircle,
-  Edit
+  AlertCircle
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 // Import hooks
 import { usePost } from '@/hooks/use-post';
+
+// Import components
+import { PostCreationInterface } from '@/components/posts/post-creation-interface';
 
 interface EditPostPageProps {
   params: {
@@ -34,6 +37,41 @@ export default function EditPostPage({ params }: EditPostPageProps) {
       media: true
     }
   });
+
+  // Convert post data to form data format
+  const initialData = React.useMemo(() => {
+    if (!post) return undefined;
+    
+    return {
+      channel_id: post.channel_id || '',
+      contract_id: post.contract_id,
+      title: post.title || '',
+      creative_text: post.creative_text || '',
+      creative_images: post.creative_images || [],
+      target_url: post.target_url,
+      placement_cost: post.placement_cost,
+      placement_currency: post.placement_currency || 'RUB',
+      kktu: '',
+      erid: post.erid || '',
+      product_description: post.product_description || '',
+      requires_marking: !!(post.advertiser_inn && post.advertiser_name),
+      scheduled_at: post.scheduled_at ? new Date(post.scheduled_at) : null
+    };
+  }, [post]);
+
+  const handleSave = (updatedPost: any) => {
+    toast.success('Размещение успешно сохранено');
+    router.push('/posts');
+  };
+
+  const handlePublish = (updatedPost: any) => {
+    toast.success('Размещение успешно опубликовано');
+    router.push('/posts');
+  };
+
+  const handleCancel = () => {
+    router.push('/posts');
+  };
 
   if (isLoading) {
     return (
@@ -66,7 +104,7 @@ export default function EditPostPage({ params }: EditPostPageProps) {
                 </p>
                 <Button 
                   variant="outline" 
-                  onClick={() => router.push('/dashboard/posts')}
+                  onClick={() => router.push('/posts')}
                   className="mt-4 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
                 >
                   Вернуться к списку
@@ -80,53 +118,43 @@ export default function EditPostPage({ params }: EditPostPageProps) {
   }
 
   return (
-    <div className="container mx-auto px-6 py-8 max-w-7xl">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push('/dashboard/posts')}
-          className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Назад к списку
-        </Button>
-        <div>
-          <h1 className="text-3xl font-semibold text-zinc-900 dark:text-white">
-            Редактирование размещения
-          </h1>
-          <p className="text-zinc-500 dark:text-zinc-400 mt-1">
-            {post.title}
-          </p>
+      <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/posts')}
+              className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Назад к списку
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">
+                Редактирование размещения
+              </h1>
+              <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
+                {post.title}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Placeholder for Edit Interface */}
-      <Card className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-        <CardContent className="p-8">
-          <div className="text-center">
-            <Edit className="w-12 h-12 text-zinc-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-              Редактирование размещения
-            </h3>
-            <p className="text-zinc-500 dark:text-zinc-400 mb-4">
-              Интерфейс редактирования будет реализован в следующих задачах
-            </p>
-            <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-4 text-left max-w-md mx-auto">
-              <h4 className="font-medium text-zinc-900 dark:text-white mb-2">Информация о размещении:</h4>
-              <div className="space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
-                <p><strong>ID:</strong> {post.id}</p>
-                <p><strong>Название:</strong> {post.title}</p>
-                <p><strong>Статус:</strong> {post.status}</p>
-                <p><strong>Канал:</strong> {post.channel_id}</p>
-                <p><strong>Создано:</strong> {new Date(post.created_at).toLocaleString('ru-RU')}</p>
-                <p><strong>Обновлено:</strong> {new Date(post.updated_at).toLocaleString('ru-RU')}</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Content */}
+      <div className="container mx-auto px-6 py-8 max-w-7xl">
+        <PostCreationInterface
+          mode="edit"
+          postId={params.id}
+          initialData={initialData}
+          onSave={handleSave}
+          onPublish={handlePublish}
+          onCancel={handleCancel}
+        />
+      </div>
     </div>
   );
 } 

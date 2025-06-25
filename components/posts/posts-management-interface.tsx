@@ -56,7 +56,6 @@ export function PostsManagementInterface({ className }: PostsManagementInterface
     create,
     update,
     delete: deletePost,
-    duplicate
   } = usePosts({
     filters: {
       search: searchQuery,
@@ -118,14 +117,6 @@ export function PostsManagementInterface({ className }: PostsManagementInterface
   }, []);
 
   // Individual post actions
-  const handleDuplicate = useCallback(async (id: string) => {
-    try {
-      await duplicate(id);
-    } catch (error) {
-      console.error('Failed to duplicate post:', error);
-    }
-  }, [duplicate]);
-
   const handleDelete = useCallback(async (id: string) => {
     if (window.confirm('Вы уверены, что хотите удалить это размещение?')) {
       try {
@@ -347,10 +338,8 @@ export function PostsManagementInterface({ className }: PostsManagementInterface
           selectedIds={selectedIds}
           onSelectPost={handleSelectPost}
           onSelectAll={handleSelectAll}
-          onDuplicate={handleDuplicate}
           onDelete={handleDelete}
           onPublish={handlePublish}
-          onSchedule={handleSchedule}
         />
       ) : (
         <PostsGrid 
@@ -358,10 +347,8 @@ export function PostsManagementInterface({ className }: PostsManagementInterface
           isLoading={isLoading}
           selectedIds={selectedIds}
           onSelectPost={handleSelectPost}
-          onDuplicate={handleDuplicate}
           onDelete={handleDelete}
           onPublish={handlePublish}
-          onSchedule={handleSchedule}
         />
       )}
 

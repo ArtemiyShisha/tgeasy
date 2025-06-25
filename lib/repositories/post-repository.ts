@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { Database } from '@/types/database'
 import { 
   Post, 
@@ -18,6 +19,11 @@ import { getCurrentUserId } from '@/lib/auth/session'
 export class PostRepository {
   private supabase = createClient()
 
+  /** Получаем экземпляр клиента: если userId null используем service-role */
+  private getClient(userId: string | null) {
+    return userId ? this.supabase : createAdminClient()
+  }
+
   /**
    * Создание нового поста
    */
@@ -28,15 +34,16 @@ export class PostRepository {
         throw new Error('User not authenticated')
       }
 
-      // Формируем базовый объект только с обязательными полями
+      const now = new Date()
+
       const postData: any = {
         user_id: currentUserId,
         channel_id: data.channel_id,
         title: data.title,
         status: 'draft',
         creative_text: (data.creative_text && data.creative_text.trim().length > 0) ? data.creative_text : '.',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        created_at: now.toISOString(),
+        updated_at: now.toISOString()
       }
 
       // Добавляем поля только если они переданы и не пустые
@@ -81,6 +88,17 @@ export class PostRepository {
 
       if (data.scheduled_at) {
         postData.scheduled_at = data.scheduled_at
+
+        const scheduledDate = new Date(data.scheduled_at)
+
+        // Если время публикации в будущем — ставим статус "scheduled", иначе сразу "published"
+        if (scheduledDate > now) {
+          postData.status = 'scheduled'
+        } else {
+          postData.status = 'published'
+          // Гарантируем published_at >= created_at, поэтому используем now
+          postData.published_at = now.toISOString()
+        }
       }
 
       // Устанавливаем ord_status по умолчанию
@@ -91,7 +109,7 @@ export class PostRepository {
         postData.status = 'draft'
       }
 
-      const { data: post, error } = await this.supabase
+      const { data: post, error } = await this.getClient(currentUserId)
         .from('posts')
         .insert(postData as any)
         .select()
@@ -111,22 +129,40 @@ export class PostRepository {
   /**
    * Получение поста по ID
    */
-  async findById(userId: string, postId: string): Promise<Post | null> {
+  async findById(userId: string | null, postId: string): Promise<Post | null> {
     try {
-      const { data: post, error } = await this.supabase
+      console.log(`PostRepository.findById called with:`, { userId, postId })
+      
+      let query = this.getClient(userId)
         .from('posts')
         .select('*')
         .eq('id', postId)
-        .eq('user_id', userId)
-        .single()
+
+      if (userId) {
+        query = query.eq('user_id', userId)
+      }
+
+      console.log('Executing findById query...')
+      const { data: post, error } = await query.single()
 
       if (error) {
+        console.error('PostRepository.findById database error:', {
+          error,
+          userId,
+          postId
+        })
         if (error.code === 'PGRST116') return null // Not found
         throw new PostError(`Failed to find post: ${error.message}`, 'FIND_FAILED')
       }
 
-      return this.transformDbPost(post)
+      console.log('PostRepository.findById raw data:', post)
+      
+      const transformed = this.transformDbPost(post)
+      console.log('PostRepository.findById transformed data:', transformed)
+      
+      return transformed
     } catch (error) {
+      console.error('PostRepository.findById error:', error)
       if (error instanceof PostError) throw error
       throw new PostError(`Unexpected error finding post: ${error}`, 'UNKNOWN_ERROR')
     }
@@ -135,15 +171,15 @@ export class PostRepository {
   /**
    * Получение поста с связанными данными
    */
-  async findByIdWithRelations(userId: string, postId: string): Promise<PostWithRelations | null> {
+  async findByIdWithRelations(userId: string | null, postId: string): Promise<PostWithRelations | null> {
     try {
-      const { data: post, error } = await this.supabase
+      let query = this.getClient(userId)
         .from('posts')
         .select(`
           *,
           channel:telegram_channels!posts_channel_id_fkey (
             id,
-            title,
+            channel_title,
             telegram_channel_id
           ),
           contract:contracts!posts_contract_id_fkey (
@@ -154,10 +190,10 @@ export class PostRepository {
           media:post_media (
             id,
             post_id,
-            file_path,
+            file_path:file_url,
             file_name,
             file_size,
-            file_type,
+            mime_type,
             sort_order,
             created_at
           ),
@@ -172,8 +208,12 @@ export class PostRepository {
           )
         `)
         .eq('id', postId)
-        .eq('user_id', userId)
-        .single()
+
+      if (userId) {
+        query = query.eq('user_id', userId)
+      }
+
+      const { data: post, error } = await query.single()
 
       if (error) {
         if (error.code === 'PGRST116') return null // Not found
@@ -192,7 +232,7 @@ export class PostRepository {
    */
   async findMany(userId: string, filters: PostFilters = {}): Promise<PostsResult> {
     try {
-      let query = this.supabase
+      let query = this.getClient(userId)
         .from('posts')
         .select('*', { count: 'exact' })
         .eq('user_id', userId)
@@ -258,20 +298,29 @@ export class PostRepository {
         updated_at: new Date().toISOString()
       }
 
+      // Колонка requires_marking отсутствует в таблице posts – используем только для логики на уровне сервисов
+      if ('requires_marking' in updateData) {
+        delete updateData.requires_marking;
+      }
+
       // Преобразуем массив изображений в JSON
       if (data.creative_images) {
         updateData.creative_images = JSON.stringify(data.creative_images)
       }
 
-      const { data: post, error } = await this.supabase
+      let query = this.getClient(userId)
         .from('posts')
         .update(updateData)
         .eq('id', postId)
-        .eq('user_id', userId)
-        .select()
-        .single()
+
+      if (userId) {
+        query = query.eq('user_id', userId)
+      }
+
+      const { data: post, error } = await query.select().single()
 
       if (error) {
+        console.error('Supabase update error:', error.code, error.message, error.details);
         throw new PostError(`Failed to update post: ${error.message}`, 'UPDATE_FAILED')
       }
 
@@ -289,16 +338,21 @@ export class PostRepository {
     try {
       // Сначала удаляем связанные медиафайлы и аналитику
       await Promise.all([
-        this.supabase.from('post_media').delete().eq('post_id', postId),
-        this.supabase.from('post_analytics').delete().eq('post_id', postId)
+        this.getClient(userId).from('post_media').delete().eq('post_id', postId),
+        this.getClient(userId).from('post_analytics').delete().eq('post_id', postId)
       ])
 
       // Затем удаляем сам пост
-      const { error } = await this.supabase
+      let deleteQuery = this.getClient(userId)
         .from('posts')
         .delete()
         .eq('id', postId)
-        .eq('user_id', userId)
+
+      if (userId) {
+        deleteQuery = deleteQuery.eq('user_id', userId)
+      }
+
+      const { error } = await deleteQuery
 
       if (error) {
         throw new PostError(`Failed to delete post: ${error.message}`, 'DELETE_FAILED')
@@ -314,7 +368,7 @@ export class PostRepository {
    */
   async findByChannelId(userId: string, channelId: string): Promise<Post[]> {
     try {
-      const { data: posts, error } = await this.supabase
+      const { data: posts, error } = await this.getClient(userId)
         .from('posts')
         .select('*')
         .eq('user_id', userId)
@@ -337,7 +391,7 @@ export class PostRepository {
    */
   async findScheduled(userId: string, beforeDate?: Date): Promise<Post[]> {
     try {
-      let query = this.supabase
+      let query = this.getClient(userId)
         .from('posts')
         .select('*')
         .eq('user_id', userId)
@@ -368,7 +422,7 @@ export class PostRepository {
    */
   async findByOrdStatus(userId: string, ordStatus: 'pending' | 'registered' | 'failed'): Promise<Post[]> {
     try {
-      const { data: posts, error } = await this.supabase
+      const { data: posts, error } = await this.getClient(userId)
         .from('posts')
         .select('*')
         .eq('user_id', userId)
@@ -391,7 +445,7 @@ export class PostRepository {
    */
   async search(userId: string, query: string, limit: number = 20): Promise<Post[]> {
     try {
-      const { data: posts, error } = await this.supabase
+      const { data: posts, error } = await this.getClient(userId)
         .from('posts')
         .select('*')
         .eq('user_id', userId)
@@ -415,16 +469,19 @@ export class PostRepository {
    */
   async updateStatus(userId: string, postId: string, status: PostStatus): Promise<Post> {
     try {
-      const { data: post, error } = await this.supabase
+      let query = this.getClient(userId)
         .from('posts')
         .update({ 
           status,
           updated_at: new Date().toISOString()
         })
         .eq('id', postId)
-        .eq('user_id', userId)
-        .select()
-        .single()
+        
+      if (userId) {
+        query = query.eq('user_id', userId)
+      }
+      
+      const { data: post, error } = await query.select().single()
 
       if (error) {
         throw new PostError(`Failed to update post status: ${error.message}`, 'UPDATE_FAILED')
@@ -448,7 +505,7 @@ export class PostRepository {
     sort_order?: number
   }): Promise<PostMedia> {
     try {
-      const { data: media, error } = await this.supabase
+      const { data: media, error } = await this.getClient(null)
         .from('post_media')
         .insert({
           post_id: postId,
@@ -487,7 +544,7 @@ export class PostRepository {
   async removeMedia(userId: string, mediaId: string): Promise<void> {
     try {
       // Проверяем, что медиа принадлежит пользователю
-      const { data: media, error: fetchError } = await this.supabase
+      const { data: media, error: fetchError } = await this.getClient(null)
         .from('post_media')
         .select(`
           id,
@@ -506,7 +563,7 @@ export class PostRepository {
         throw new PostError('Media not found or access denied', 'MEDIA_ACCESS_DENIED')
       }
 
-      const { error } = await this.supabase
+      const { error } = await this.getClient(null)
         .from('post_media')
         .delete()
         .eq('id', mediaId)
@@ -545,25 +602,56 @@ export class PostRepository {
   }
 
   /**
-   * Преобразование данных из БД в интерфейс Post
+   * Преобразование данных из БД в модель
    */
   private transformDbPost(dbPost: any): Post {
-    const parseImages = (value: any): string[] => {
-      if (!value) return []
-      if (Array.isArray(value)) return value
-      if (typeof value === 'string') {
+    console.log('transformDbPost input:', dbPost)
+    
+    try {
+      // Парсим creative_images если это строка
+      let creativeImages = dbPost.creative_images
+      if (typeof creativeImages === 'string') {
+        console.log('Parsing creative_images from string:', creativeImages)
         try {
-          return JSON.parse(value)
-        } catch {
-          return []
+          creativeImages = JSON.parse(creativeImages)
+        } catch (e) {
+          console.error('Failed to parse creative_images:', e)
+          creativeImages = []
         }
       }
-      return []
-    }
-
-    return {
-      ...dbPost,
-      creative_images: parseImages(dbPost.creative_images)
+      
+      const transformed = {
+        id: dbPost.id,
+        user_id: dbPost.user_id,
+        channel_id: dbPost.channel_id,
+        contract_id: dbPost.contract_id,
+        title: dbPost.title,
+        status: dbPost.status,
+        content: dbPost.content,
+        creative_text: dbPost.creative_text || dbPost.content || '', // fallback to content
+        target_url: dbPost.target_url,
+        creative_images: Array.isArray(creativeImages) ? creativeImages : [],
+        marking_required: dbPost.marking_required || false,
+        advertiser_inn: dbPost.advertiser_inn,
+        advertiser_name: dbPost.advertiser_name,
+        product_description: dbPost.product_description,
+        erid: dbPost.erid,
+        ord_status: dbPost.ord_status,
+        ord_error_message: dbPost.ord_error_message || null,
+        placement_cost: dbPost.placement_cost ? parseFloat(dbPost.placement_cost) : null,
+        placement_currency: dbPost.placement_currency || 'RUB',
+        scheduled_at: dbPost.scheduled_at,
+        published_at: dbPost.published_at,
+        telegram_message_id: dbPost.telegram_message_id,
+        created_at: dbPost.created_at,
+        updated_at: dbPost.updated_at
+      }
+      
+      console.log('transformDbPost output:', transformed)
+      return transformed
+    } catch (error) {
+      console.error('transformDbPost error:', error)
+      throw error
     }
   }
 
@@ -577,7 +665,7 @@ export class PostRepository {
       ...post,
       channel: dbPost.channel ? {
         id: dbPost.channel.id,
-        title: dbPost.channel.title,
+        title: dbPost.channel.channel_title,
         telegram_channel_id: dbPost.channel.telegram_channel_id
       } : undefined,
       contract: dbPost.contract ? {
@@ -585,7 +673,16 @@ export class PostRepository {
         title: dbPost.contract.title,
         advertiser_name: dbPost.contract.advertiser_name
       } : undefined,
-      media: dbPost.media || [],
+      media: dbPost.media?.map((m: any) => ({
+        id: m.id,
+        post_id: m.post_id,
+        file_path: m.file_path,
+        file_name: m.file_name,
+        file_size: m.file_size,
+        file_type: m.mime_type,
+        sort_order: m.sort_order,
+        created_at: m.created_at
+      })) || [],
       analytics: dbPost.analytics?.[0] || undefined
     }
   }

@@ -13,10 +13,15 @@ import { PlacementCostForm } from './placement-cost-form';
 import { useChannels } from '@/hooks/use-channels';
 import { useContracts } from '@/hooks/use-contracts';
 import { usePosts } from '@/hooks/use-posts';
+import { postsApi } from '@/lib/api/posts-api';
 import { CreatePostData } from '@/types/post-ui';
 import { CheckCircle, AlertCircle } from 'lucide-react';
+import { TelegramPreview } from './telegram-preview';
 
 interface PostCreationInterfaceProps {
+  mode?: 'create' | 'edit';
+  initialData?: Partial<FormData>;
+  postId?: string;
   onSave?: (post: any) => void;
   onPublish?: (post: any) => void;
   onCancel?: () => void;
@@ -46,11 +51,17 @@ const INITIAL_FORM_DATA: FormData = {
 };
 
 export function PostCreationInterface({ 
+  mode = 'create',
+  initialData,
+  postId,
   onSave, 
   onPublish, 
   onCancel 
 }: PostCreationInterfaceProps) {
-  const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA);
+  const [formData, setFormData] = useState<FormData>({
+    ...INITIAL_FORM_DATA,
+    ...initialData
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -59,11 +70,36 @@ export function PostCreationInterface({
   // Hooks
   const { channels } = useChannels();
   const { contracts } = useContracts();
-  const { create: createPost } = usePosts();
+  const { create: createPost, update: updatePost } = usePosts();
+
+  // Initialize form data when initialData changes (for edit mode)
+  React.useEffect(() => {
+    if (initialData && mode === 'edit') {
+      const needMarking = Boolean(initialData.requires_marking ?? (initialData.contract_id || initialData.kktu || initialData.product_description));
+      setFormData(prev => ({
+        ...prev,
+        ...initialData,
+        requires_marking: needMarking
+      }));
+    }
+  }, [initialData, mode]);
 
   // Update form field
   const updateField = (field: keyof FormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      
+      // Если отключаем маркировку, очищаем связанные поля
+      if (field === 'requires_marking' && value === false) {
+        updated.contract_id = null;
+        updated.kktu = '';
+        updated.product_description = '';
+        updated.erid = '';
+      }
+      
+      return updated;
+    });
+    
     // Clear error when field is updated
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -145,27 +181,48 @@ export function PostCreationInterface({
     setActionError(null);
     
     try {
-      const postData: CreatePostData = {
+      const postData: any = {
         channel_id: formData.channel_id,
-        contract_id: formData.requires_marking ? formData.contract_id ?? null : null,
         title: formData.title,
         creative_text: formData.creative_text,
         creative_images: formData.creative_images,
         target_url: formData.target_url,
         placement_cost: formData.placement_cost,
         placement_currency: formData.placement_currency || 'RUB',
-        kktu: formData.requires_marking ? formData.kktu : '',
-        product_description: formData.requires_marking ? formData.product_description : '',
-        requires_marking: formData.requires_marking,
+        status: 'draft',
         scheduled_at: null // Draft is never scheduled
       };
+
+      // Добавляем поля маркировки только если она включена
+      if (formData.requires_marking) {
+        postData.contract_id = formData.contract_id;
+        postData.kktu = formData.kktu;
+        postData.product_description = formData.product_description;
+        postData.requires_marking = true;
+      } else {
+        // Отключена маркировка – убираем поля, чтобы не проходила валидация
+        postData.contract_id = null;
+        postData.requires_marking = false;
+        delete postData.kktu;
+        delete postData.product_description;
+        // При обновлении также нужно очистить erid
+        if (mode === 'edit') {
+          postData.erid = null;
+        }
+      }
       
-      const post = await createPost(postData);
+      let post;
+      if (mode === 'edit' && postId) {
+        post = await updatePost(postId, postData);
+      } else {
+        post = await createPost(postData);
+      }
+      
       setLastSaved(new Date());
       onSave?.(post);
     } catch (error) {
       console.error('Failed to save draft:', error);
-      setActionError('Не удалось сохранить черновик. Попробуйте еще раз.');
+      setActionError(`Не удалось сохранить ${mode === 'edit' ? 'изменения' : 'черновик'}. Попробуйте еще раз.`);
     } finally {
       setIsLoading(false);
     }
@@ -182,22 +239,54 @@ export function PostCreationInterface({
     setActionError(null);
     
     try {
-      const postData: CreatePostData = {
+      const postData: any = {
         channel_id: formData.channel_id,
-        contract_id: formData.requires_marking ? formData.contract_id ?? null : null,
         title: formData.title,
         creative_text: formData.creative_text,
         creative_images: formData.creative_images,
         target_url: formData.target_url,
         placement_cost: formData.placement_cost,
         placement_currency: formData.placement_currency || 'RUB',
-        kktu: formData.requires_marking ? formData.kktu : '',
-        product_description: formData.requires_marking ? formData.product_description : '',
-        requires_marking: formData.requires_marking,
         scheduled_at: null
       };
-      const post = await createPost(postData);
-      onPublish?.(post);
+
+      // Добавляем поля маркировки только если она включена
+      if (formData.requires_marking) {
+        postData.contract_id = formData.contract_id;
+        postData.kktu = formData.kktu;
+        postData.product_description = formData.product_description;
+        postData.requires_marking = true;
+      } else {
+        // Отключена маркировка – убираем поля, чтобы не проходила валидация
+        postData.contract_id = null;
+        postData.requires_marking = false;
+        delete postData.kktu;
+        delete postData.product_description;
+        // При обновлении также нужно очистить erid
+        if (mode === 'edit') {
+          postData.erid = null;
+        }
+      }
+      
+      let draft;
+      if (mode === 'edit' && postId) {
+        draft = await updatePost(postId, postData);
+      } else {
+        draft = await createPost(postData);
+      }
+
+      // Запрашиваем публикацию через специальный endpoint,
+      // чтобы статус и published_at расставились на сервере корректно
+      let publishedPost = draft;
+      try {
+        publishedPost = await postsApi.publishPost(draft.id || postId!);
+        // локально помечаем статус для UI до полной синхронизации
+        publishedPost.status = 'published';
+      } catch (err) {
+        console.error('Failed to publish post:', err);
+      }
+
+      onPublish?.(publishedPost);
     } catch (error) {
       console.error('Failed to publish post:', error);
       setActionError('Не удалось опубликовать размещение. Проверьте данные и попробуйте еще раз.');
@@ -228,21 +317,42 @@ export function PostCreationInterface({
     setActionError(null);
     
     try {
-      const postData: CreatePostData = {
+      const postData: any = {
         channel_id: formData.channel_id,
-        contract_id: formData.requires_marking ? formData.contract_id ?? null : null,
         title: formData.title,
         creative_text: formData.creative_text,
         creative_images: formData.creative_images,
         target_url: formData.target_url,
         placement_cost: formData.placement_cost,
         placement_currency: formData.placement_currency || 'RUB',
-        kktu: formData.requires_marking ? formData.kktu : '',
-        product_description: formData.requires_marking ? formData.product_description : '',
-        requires_marking: formData.requires_marking,
         scheduled_at: formData.scheduled_at.toISOString()
       };
-      const post = await createPost(postData);
+
+      // Добавляем поля маркировки только если она включена
+      if (formData.requires_marking) {
+        postData.contract_id = formData.contract_id;
+        postData.kktu = formData.kktu;
+        postData.product_description = formData.product_description;
+        postData.requires_marking = true;
+      } else {
+        // Отключена маркировка – убираем поля, чтобы не проходила валидация
+        postData.contract_id = null;
+        postData.requires_marking = false;
+        delete postData.kktu;
+        delete postData.product_description;
+        // При обновлении также нужно очистить erid
+        if (mode === 'edit') {
+          postData.erid = null;
+        }
+      }
+      
+      let post;
+      if (mode === 'edit' && postId) {
+        post = await updatePost(postId, postData);
+      } else {
+        post = await createPost(postData);
+      }
+      
       onPublish?.(post);
     } catch (error) {
       console.error('Failed to schedule post:', error);
@@ -378,9 +488,14 @@ export function PostCreationInterface({
           <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
             Предварительный просмотр
           </h3>
-          <div className="text-sm text-zinc-500 dark:text-zinc-400">
-            Здесь будет показан предварительный просмотр размещения в Telegram
-          </div>
+          <TelegramPreview
+            content={formData.creative_text}
+            images={formData.creative_images}
+            targetUrl={formData.target_url}
+            channelId={formData.channel_id}
+            channels={channels}
+            advertiserName={formData.requires_marking && formData.erid ? 'Рекламодатель' : undefined}
+          />
         </div>
       </div>
     </div>

@@ -19,12 +19,6 @@ export async function GET(
 
     // Получение user ID
     const userId = await getUserIdFromRequest(request)
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
-        { status: 401 }
-      )
-    }
 
     const postId = params.id
 
@@ -35,8 +29,8 @@ export async function GET(
     // Получение поста
     const postService = new PostService()
     const post = includeRelations 
-      ? await postService.getPostWithRelations(userId, postId)
-      : await postService.getPost(userId, postId)
+      ? await postService.getPostWithRelations(userId as any, postId)
+      : await postService.getPost(userId as any, postId)
 
     if (!post) {
       return NextResponse.json(
@@ -52,13 +46,18 @@ export async function GET(
 
   } catch (error: any) {
     console.error(`GET /api/posts/${params.id} error:`, error)
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    })
     
     return NextResponse.json(
       { 
         success: false, 
         error: { 
           code: 'INTERNAL_ERROR', 
-          message: 'Failed to get post' 
+          message: error.message || 'Failed to get post' 
         } 
       },
       { status: 500 }

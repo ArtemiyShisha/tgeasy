@@ -195,7 +195,11 @@ export const postsApi = {
       method: 'POST',
       body: JSON.stringify(data),
     })
-    return response.data as Post
+    // API возвращает { post: Post, ... } или напрямую Post, обрабатываем оба случая
+    if ((response.data as any).post) {
+      return (response.data as any).post as Post;
+    }
+    return response.data as Post;
   },
 
   /**

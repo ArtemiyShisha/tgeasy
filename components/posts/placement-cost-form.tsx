@@ -1,7 +1,7 @@
 'use client';
 
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RubleIcon } from '@/components/ui/ruble-icon';
 
@@ -15,7 +15,10 @@ interface PlacementCostFormProps {
   onChange: (field: keyof PlacementCostFormData, value: any) => void;
 }
 
-export function PlacementCostForm({ data, onChange }: PlacementCostFormProps) {
+export function PlacementCostForm({ 
+  data, 
+  onChange 
+}: PlacementCostFormProps) {
   const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     const numValue = value ? parseFloat(value) : null;
@@ -39,7 +42,7 @@ export function PlacementCostForm({ data, onChange }: PlacementCostFormProps) {
             min="0"
             step="0.01"
             placeholder="0.00"
-            value={data.placement_cost ?? ''}
+            value={data.placement_cost || ''}
             onChange={handleCostChange}
             className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
           />
@@ -48,7 +51,10 @@ export function PlacementCostForm({ data, onChange }: PlacementCostFormProps) {
         {/* Currency */}
         <div className="space-y-2">
           <Label htmlFor="placement_currency">Валюта</Label>
-          <Select value={data.placement_currency} onValueChange={(value) => onChange('placement_currency', value)}>
+          <Select
+            value={data.placement_currency}
+            onValueChange={(value) => onChange('placement_currency', value)}
+          >
             <SelectTrigger className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
               <SelectValue />
             </SelectTrigger>
